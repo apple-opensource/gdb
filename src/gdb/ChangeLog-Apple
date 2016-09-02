@@ -1,3 +1,35 @@
+2009-05-14  Greg Clayton  <gclayton@apple.com>
+
+	* linespec.c (symbols_found): Check canonical arg for NULL.
+
+2009-03-09  Greg Clayton  <gclayton@apple.com>
+
+	* dbxread.c (dbx_symfile_read): Don't read minsyms from dSYM files.
+
+2009-01-07  Greg Clayton  <gclayton@apple.com>
+
+	* arm-tdep.c (condition_true): Fixed the LS and HI conditions.
+
+2008-09-08  Jim Ingham  <jingham@apple.com>
+
+	* gnu-v3-abi.c (gnuv3_rtti_type): Check the TYPE_VPTR_BASETYPE is
+	not NULL.
+	(gnuv3_virtual_fn_field): Ditto.
+	(gnuv3_baseclass_offset): Ditto.
+	
+2008-09-25  Jim Ingham  <jingham@apple.com>
+
+	* breakpoint.c (enable_command): Use ALL_BREAKPOINTS_SAFE.
+	
+2008-06-26  Greg Clayton  <gclayton@apple.com>
+
+	* valops.c (value_full_object): Add try/catch around 
+	value_rtti_type function call.
+
+2008-06-18  Jim Ingham  <jingham@apple.com>
+
+	* config/arm/macosx.mh: Remove -Wno-long-double.
+
 2008-05-09  Greg Clayton  <gclayton@apple.com>
 
 	* remote.c (remote_create_inferior): Increase timeout for the launch
