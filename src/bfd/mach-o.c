@@ -910,6 +910,8 @@ bfd_mach_o_write_contents (bfd *abfd)
 	case BFD_MACH_O_LC_PREBOUND_DYLIB:
 	case BFD_MACH_O_LC_ROUTINES:
 	case BFD_MACH_O_LC_SUB_FRAMEWORK:
+	case BFD_MACH_O_LC_LAZY_LOAD_DYLIB:
+	case BFD_MACH_O_LC_ENCRYPTION_INFO:
 	  break;
 	default:
 	  fprintf (stderr,
@@ -2130,6 +2132,8 @@ bfd_mach_o_scan_read_command (bfd *abfd, bfd_mach_o_load_command *command)
     case BFD_MACH_O_LC_RPATH:
     case BFD_MACH_O_LC_CODE_SIGNATURE:
     case BFD_MACH_O_LC_SEGMENT_SPLIT_INFO:
+    case BFD_MACH_O_LC_LAZY_LOAD_DYLIB:
+    case BFD_MACH_O_LC_ENCRYPTION_INFO:
       break;
     default:
       fprintf (stderr, "unable to read unknown load command 0x%lx\n",
@@ -2290,7 +2294,6 @@ bfd_mach_o_scan (bfd *abfd,
 
   mdata->header = *header;
   mdata->symbols = NULL;
-
   mdata->scanning_load_cmds = 1;
 
   abfd->flags = (abfd->xvec->object_flags
@@ -2313,14 +2316,14 @@ bfd_mach_o_scan (bfd *abfd,
   if (header->ncmds != 0)
     {
       /* Use zalloc so we set all the "type" fields to 0 - we use that
-	 to indicate that we have not read the command data for that
-	 command in yet.  */
+        to indicate that we have not read the command data for that
+        command in yet.  */
       mdata->commands =
 	((bfd_mach_o_load_command *)
 	 bfd_zalloc (abfd, header->ncmds * sizeof (bfd_mach_o_load_command)));
       if (mdata->commands == NULL)
 	return -1;
-      
+
       for (i = 0; i < header->ncmds; i++)
 	{
 	  bfd_mach_o_load_command *cur = &mdata->commands[i];
@@ -2350,6 +2353,7 @@ bfd_mach_o_scan (bfd *abfd,
 
   bfd_mach_o_flatten_sections (abfd);
   mdata->scanning_load_cmds = 0;
+
   return 0;
 }
 

@@ -49,6 +49,7 @@
 #include "inferior.h"
 #include "demangle.h"          /* For cplus_demangle */
 #include "osabi.h"
+#include "inlining.h"          /* For the rb tree stuff.  */
 #include "ui-out.h"
 #include "cli-out.h"
 
@@ -102,9 +103,6 @@ static unsigned int objc_class_method_limit = 10000;
 /* We don't yet have an dynamic way of figuring out what the ObjC
    runtime version is.  So this will override our guess.  */
 static int objc_runtime_version = 0;
-
-/* For the rb tree stuff.  */
-#include "inlining.h"
 
 /* APPLE LOCAL: This tree keeps the map of {class, selector} -> implementation.  */
 static struct rb_tree_node *implementation_tree = NULL;
@@ -2396,9 +2394,9 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
 
   sel_str[0] = '\0';
 
-  implementation = lookup_implementation_in_cache (class, sel);
-  if (implementation != 0)
-    return implementation;
+   implementation = lookup_implementation_in_cache (class, sel);
+   if (implementation != 0)
+     return implementation;
 
   if (new_objc_runtime_internals ())
     return (new_objc_runtime_find_impl (class, sel, 0));
@@ -2432,7 +2430,7 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
       {
 	if (info_verbose)
 	  {
-	    warning ("Got error reading class or its name.");
+	    printf_unfiltered ("Got error reading class or its name.\n");
 	  }
 	return 0;
       }
@@ -2456,12 +2454,26 @@ find_implementation_from_class (CORE_ADDR class, CORE_ADDR sel)
 	  printf_unfiltered ("Could not look up class for name: \"%s\".\n", class_name);
 	return 0;
       }
-    else if (class_addr != class)
+    else 
       {
-	if (info_verbose)
-	  printf_unfiltered ("Class address for name: \"%s\": 0x%s didn't match input address: 0x%s.\n", 
-		   class_name, paddr_nz (class_addr), paddr_nz (class));
-	return 0;
+        /* We used to compare the CLASS and VERIFY_STR class object addresses
+           but this would fail if we're looking at a metaclass object - when
+           we call lookup_objc_class on the metaclass name, we get the class.
+           The names of the classes will be the same, so we'll use that.  We
+           could have also tested to see if the 'super_class' field of one
+           matched the other.  */
+        struct objc_class verify_str;
+        TRY_CATCH (e, RETURN_MASK_ALL)
+          {
+            read_objc_class (class, &verify_str);
+          }
+        if (e.reason == NO_ERROR && verify_str.name != class_str.name)
+          {  
+	    if (info_verbose)
+	      printf_unfiltered ("Class address for name: \"%s\": 0x%s didn't match input address: 0x%s.\n", 
+		       class_name, paddr_nz (class_addr), paddr_nz (class));
+	    return 0;
+          }
       }
   }  
 

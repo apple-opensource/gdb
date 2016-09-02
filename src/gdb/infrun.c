@@ -1445,6 +1445,13 @@ handle_inferior_event (struct execution_control_state *ecs)
   int sw_single_step_trap_p = 0;
   int stopped_by_watchpoint = -1;	/* Mark as unknown.  */
 
+  /* APPLE LOCAL - Some convenience variables we'll need
+     below.  */
+
+  struct frame_id prev_frame_id;
+  struct gdb_exception e;
+  /* END APPLE LOCAL */
+
   /* Cache the last pid/waitstatus. */
   target_last_wait_ptid = ecs->ptid;
   target_last_waitstatus = *ecs->wp;
@@ -2773,9 +2780,20 @@ extern void macosx_print_extra_stop_info (int, CORE_ADDR);
      A common bug here is that gdb doesn't unwind correctly from
      some stub routine or hand written assembly code and the previous
      frame == steping frame comparison fails.  */
+  /* APPLE LOCAL: Some jokers like to put the stack pointer in
+     unreadable memory occasionally.  Don't error out of 
+     handle_inferior_event for that...  */
 
-  if (frame_id_eq (frame_unwind_id (get_current_frame ()), step_frame_id)
+    TRY_CATCH (e, RETURN_MASK_ALL)
+      {
+	prev_frame_id = frame_unwind_id (get_current_frame ());
+      }
+    if (e.reason != NO_ERROR)
+      prev_frame_id = null_frame_id;
+
+  if (frame_id_eq (prev_frame_id, step_frame_id)
       || stepping_over_inlined_subroutine)
+    /* END APPLE LOCAL */
     {
       /* It's a subroutine call.  */
       CORE_ADDR real_stop_pc;

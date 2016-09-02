@@ -6907,6 +6907,8 @@ watch_command_1 (char *arg, int accessflag, int by_location, int from_tty)
 
   mark = value_mark ();
   val = evaluate_expression (exp);
+  if (TYPE_CODE (value_type (val)) == TYPE_CODE_ERROR)
+    error ("Can not watch an expression of unknown type.");
   release_value (val);
   if (value_lazy (val))
     value_fetch_lazy (val);
@@ -8642,6 +8644,10 @@ breakpoint_re_set_one (void *bint)
   struct breakpoint *b = (struct breakpoint *) bint;
   struct value *mark;
   int i;
+  /* APPLE LOCAL begin dealing correctly with multiple sals.  */
+  int found;
+  int j;
+  /* APPLE LOCAL end dealing correctly with multiple sals.  */
   /* APPLE LOCAL breakpoint fix */
   /* Don't need locals not_found or not_found_ptr */
   struct symtabs_and_lines sals;
@@ -8801,7 +8807,112 @@ breakpoint_re_set_one (void *bint)
 	}
       /* APPLE LOCAL end Don't go on if we found nothing...  */
 
-      for (i = 0; i < sals.nelts; i++)
+      /* APPLE LOCAL begin dealing correctly with multiple sals.  */
+
+      /* If there's more than one sal, figure out the right one to
+	 use.  */
+
+      found = 0;
+      if (sals.nelts > 1)
+
+	/* Go through the list of sals trying to find one whose
+	   pc is the same as the breakpoint location address, or
+	   whose pc is the same as the breakpoint location address 
+	   plus an offset.   The offset is the beginning address of the
+	   section in the objfile that contains the sal pc.  */
+
+	for (j = 0; j < sals.nelts && !found; j++)
+	  {
+
+	    /* Check each SAL (until the correct one is found).  */
+
+	    struct objfile *bp_objfile = NULL;
+	    struct obj_section *osect = NULL;
+	    struct symtab_and_line *sal = &(sals.sals[j]);
+	    CORE_ADDR base_pc;
+	    CORE_ADDR offset;
+	    CORE_ADDR target_pc;
+
+	    /* First, find the objfile for the SAL.  */
+	    
+	    if (sal->symtab != NULL)
+	      bp_objfile = sal->symtab->objfile;
+	    else if (sal->section != NULL)
+	      {
+		osect = find_pc_sect_section (sal->pc, sal->section);
+		if (osect)
+		  bp_objfile = osect->objfile;
+	      }
+	    else
+	      {
+		osect = find_pc_section (sal->pc);
+		if (osect)
+		  bp_objfile = osect->objfile;
+	      }
+	    if (bp_objfile && bp_objfile->separate_debug_objfile_backlink)
+	      bp_objfile = bp_objfile->separate_debug_objfile_backlink;
+	    
+	    if (!bp_objfile)
+	      continue;
+
+	    /* Next, get the address of the old breakpoint location, and the
+	       address in the sal.  */
+
+	    base_pc = b->loc->address;
+	    target_pc = sals.sals[j].pc;
+
+	    /* If the two addresses match, we've found the right SAL and
+	       we're done.  */
+
+	    if (base_pc == target_pc)
+	      {
+		i = j;
+		found = 1;
+	      }
+	    else
+	      {
+
+		/* If the addresses don't match, we need to try to find an
+		   offset to add, from an objfile section,  to make them match.  */
+	       
+		offset = 0;
+
+		/* Go through all the sections in the objfile, looking for the
+		   one that contains the SAL's pc.  */
+
+		ALL_OBJFILE_OSECTIONS (bp_objfile, osect)
+		  if (bp_objfile->separate_debug_objfile_backlink == NULL
+		      && osect->addr <= sals.sals[j].pc
+		      && sals.sals[j].pc<= osect->endaddr)
+		    {
+		      /* We've found the correct section, so we use it's
+			 offset.  */
+
+		      offset = ANOFFSET (bp_objfile->section_offsets,
+					 osect->the_bfd_section->index);
+		      break;
+		    }
+
+		/* If breakpoint address plus offset matches the SAL pc, 
+		   we've found the right SAL and we're done.  */
+
+		if (base_pc + offset == target_pc)
+		  {
+		    i = j;
+		    found = 1;
+		  }
+
+		/* Otherwise, keep looking.  */
+	      }
+	}
+
+      /* If we couldn't figure out which SAL is the right one to use, just
+	 use the last one (which mimic's the old behavior of this function).  */
+
+      if (!found)
+	i = sals.nelts - 1;
+
+      /* APPLE LOCAL end dealing correctly with multiple sals.  */
 	{
 	  resolve_sal_pc (&sals.sals[i]);
 

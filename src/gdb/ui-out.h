@@ -295,4 +295,5 @@ extern struct ui_out *ui_out_new (struct ui_out_impl *impl,
 extern int ui_out_redirect (struct ui_out *uiout, struct ui_file *outstream);
 
 void ui_out_delete (struct ui_out *uiout);
+
 #endif /* UI_OUT_H */

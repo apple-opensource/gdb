@@ -64,6 +64,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <mach/machine.h>
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -637,149 +638,6 @@ stack_flush_command (char *args, int from_tty)
     printf_filtered ("Stack cache flushed.\n");
 }
 
-#if USE_CARBON_FRAMEWORK
-
-#include <Carbon/Carbon.h>
-#include <dlfcn.h>
-
-#pragma options align=mac68k
-// We attach this to an 'odoc' event to specify a particular selection
-typedef struct {
-  SInt16      reserved0;      // must be zero
-  SInt16      fLineNumber;
-  SInt32      fSelStart;
-  SInt32      fSelEnd;
-  UInt32      reserved1;      // must be zero
-  UInt32      reserved2;      // must be zero
-} BabelAESelInfo;
-#pragma options align=reset
-
-static int 
-open_file_with_LS (const char *file_path, int lineno)
-{
-  AEKeyDesc selection_desc;
-  LSApplicationParameters app_params;
-  FSRef item_refs[1], out_app;
-  OSStatus err;	
-  BabelAESelInfo selection_info;
-  char app_path[PATH_MAX];
-  int is_xcode;
-
-  err = FSPathMakeRef ((unsigned char *) file_path, &item_refs[0], NULL);
-  if (err != noErr)
-    {
-      error ("Couldn't make FSRef from path: %s\n", file_path);
-      return 0;
-    }
-    
-  err = LSGetApplicationForItem (&item_refs[0], kLSRolesAll, &out_app, NULL);
-  if (err != noErr)
-    {
-      error ("Couldn't get the application for item: %s", file_path);
-      return 0;
-    }
-  
-  bzero (&selection_info, sizeof (selection_info));
-  selection_info.fLineNumber = lineno - 1;
-  selection_info.fSelStart = 1;
-  selection_info.fSelEnd = 1;
-	
-  err = AECreateDesc (typeChar, &selection_info, sizeof (selection_info), 
-		      &(selection_desc.descContent));
-  if (err != noErr)
-    {
-      error ("Could not make selection info AEDesc.");
-      return 0;
-    }
-
-  selection_desc.descKey = keyAEPosition;
-	
-  bzero (&app_params, sizeof (app_params));
-	
-  app_params.application = &out_app;
-  
-  FSRefMakePath (&out_app, (unsigned char *) app_path, PATH_MAX);
-  is_xcode = (strstr (app_path, "Xcode") != NULL);
-
-  /* Since we're going to have to send Xcode an AppleScript, we need to 
-     make sure it gets opened first.  kLSLaunchDefaults includes the
-     Async flag, which we don't want in this case.  */
-  
-  if (is_xcode)
-    app_params.flags = kLSLaunchDontSwitch;
-  else
-    app_params.flags = kLSLaunchDefaults | kLSLaunchDontSwitch;
-
-  err = LSOpenItemsWithRole (item_refs, 1, kLSRolesAll, &selection_desc, 
-			     &app_params, NULL, 0);
-  AEDisposeDesc (&(selection_desc.descContent));
-
-  if (err != noErr)  
-    return 0;
-
-  /* Xcode and TextEdit don't obey the keyAELocation event.  So we
-     have to also send an AppleScript to do this.  
-     FIXME: Might be good to snoop the AppleEvent this script 
-     sends, and then cons that up & send it directly.  The problem
-     with this is the version of the script the eliminates the "doc"
-     AppleScript variable fails (Xcode returns some error).  I 
-     think somebody's mishandling the "whose" clause.  So right
-     now this is not a simple AppleEvent.  Thanks to Rick Altherr
-     for the AppleScript snippet.  */
-  
-  if (is_xcode)
-    {
-      static ComponentInstance osa_component = NULL;
-      static char *format_str = "tell application \"Xcode\"\r"
-        "set doc to the first document whose path is \"%s\"\r"
-        "set selection to paragraph %d of doc\r"
-        "end tell\r";
-
-      int format_len = strlen (format_str);
-      char *script_str;
-      AEDesc script_desc;
-      OSAID ret_OSAID;
-      if (osa_component == NULL)
-        {
-          osa_component = OpenDefaultComponent (kOSAComponentType, 
-						kAppleScriptSubtype);
-        }
-      if (osa_component == NULL)
-        error ("Can't initialize the AppleScript OSA component");
-
-      /* 64 chars should be big enough to store the linenumber even if 
-         int is a long long and a bit left over for safety.  */
-      script_str = malloc (format_len + strlen (file_path) + 64);
-      sprintf (script_str, format_str, file_path, lineno);
-     
-      err = AECreateDesc (typeChar, script_str, 
-			  strlen (script_str), &script_desc);
-
-      free (script_str);
-
-      if (err != noErr)
-	error ("Can't make an AEDesc for the selection setting script.");
-
-      err = OSACompileExecute (osa_component, &script_desc, kOSANullScript, 
-			       kOSAModeNeverInteract, &ret_OSAID);
-
-      /* NOTE, maybe we should call OSAScriptError to
-	 get the error message.  But in my experience, the error message is not
-	 very helpful.  So I'll just print a warning so somebody knows I tried.  */
-      if (err != noErr)
-	warning ("Could not select current line, error %ld\n", err);
-
-      OSADispose (osa_component, ret_OSAID);
-
-      AEDisposeDesc (&script_desc);
-
-      if (err != noErr)
-        return 0;  
-    }
-    
-  return 1;
-}
-
 /* Opens the file pointed to in ARGS with the default editor
    given by LaunchServices.  If ARGS is NULL, opens the current
    source file & line.  You can also supply file:line and it will
@@ -792,6 +650,9 @@ open_command (char *args, int from_tty)
   const char *fullname = NULL;  /* Fully qualified on-disk filename */
   struct stat sb;
   int line_no = 0;
+
+  warning ("open command no longer supported - may be back in a future build.");
+  return;
 
   if (args == NULL || args[0] == '\0')
     {
@@ -847,14 +708,95 @@ open_command (char *args, int from_tty)
   else
     if (stat (filename, &sb) != 0)
       error ("File '%s' not found.", filename);
-#if USE_CARBON_FRAMEWORK
-  open_file_with_LS (filename, line_no);
-#endif
 }
 
-#endif	/* #if USE_CARBON_FRAMEWORK  */
 
-#if USE_DEBUG_SYMBOLS_FRAMEWORK
+/* Helper function for gdb_DBGCopyMatchingUUIDsForURL.
+   Given a bfd of a MachO file, look for an LC_UUID load command
+   and return that uuid in an allocated CFUUIDRef.
+   If the file being examined is fat, we assume that the bfd we're getting
+   passed in has already been iterated over to get one of the thin forks of
+   the file.
+   It is the caller's responsibility to release the memory.
+   NULL is returned if we do not find a LC_UUID for any reason.  */
+
+static CFUUIDRef
+get_uuidref_for_bfd (struct bfd *abfd)
+{
+ uint8_t uuid[16];
+ if (abfd == NULL)
+   return NULL;
+
+ if (bfd_mach_o_get_uuid (abfd, uuid, sizeof (uuid)))
+   return CFUUIDCreateWithBytes (kCFAllocatorDefault,
+             uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5],
+             uuid[6], uuid[7], uuid[8], uuid[9], uuid[10], uuid[11],
+             uuid[12], uuid[13], uuid[14], uuid[15]);
+
+ return NULL;
+}
+
+/* This is an implementation of the DebugSymbols framework's
+   DBGCopyMatchingUUIDsForURL function.  Given the path to a
+   dSYM file (not the bundle directory but the actual dSYM dwarf
+   file), it will return a CF array of UUIDs that this file has.  
+   Normally depending on DebugSymbols.framework isn't a problem but
+   we don't have this framework on all platforms and we want the
+   "add-dsym" command to continue to work without it. */
+
+static CFMutableArrayRef
+gdb_DBGCopyMatchingUUIDsForURL (const char *path)
+{
+  if (path == NULL || path[0] == '\0')
+    return NULL;
+
+  CFAllocatorRef alloc = kCFAllocatorDefault;
+  CFMutableArrayRef uuid_array = NULL;
+
+  bfd *abfd = symfile_bfd_open (path, 0);
+  if (abfd == NULL)
+    return NULL;
+  if (bfd_check_format (abfd, bfd_archive)
+      && strcmp (bfd_get_target (abfd), "mach-o-fat") == 0)
+    {
+      bfd *nbfd = NULL;
+      for (;;)
+        {
+          nbfd = bfd_openr_next_archived_file (abfd, nbfd);
+          if (nbfd == NULL)
+            break;
+          if (!bfd_check_format (nbfd, bfd_object) 
+              && !bfd_check_format (nbfd, bfd_archive))
+            continue;
+          CFUUIDRef nbfd_uuid = get_uuidref_for_bfd (nbfd);
+          if (nbfd_uuid != NULL)
+            {
+              if (uuid_array == NULL)
+                uuid_array = CFArrayCreateMutable(alloc, 0, &kCFTypeArrayCallBacks);
+              if (uuid_array)
+                CFArrayAppendValue (uuid_array, nbfd_uuid);
+              CFRelease (nbfd_uuid);
+            }
+        }
+
+    }
+  else
+   {
+      CFUUIDRef abfd_uuid = get_uuidref_for_bfd (abfd);
+      if (abfd_uuid != NULL)
+        {
+          if (uuid_array == NULL)
+            uuid_array = CFArrayCreateMutable(alloc, 0, &kCFTypeArrayCallBacks);
+          if (uuid_array)
+            CFArrayAppendValue (uuid_array, abfd_uuid);
+          CFRelease (abfd_uuid);
+        }
+    }
+
+  bfd_close (abfd);
+  return uuid_array;
+}
+
 
 CFMutableDictionaryRef
 create_dsym_uuids_for_path (char *dsym_bundle_path)
@@ -931,9 +873,7 @@ create_dsym_uuids_for_path (char *dsym_bundle_path)
 	  if (path_url == NULL)
 	    continue;
 	  
-	  uuid_array = DBGCopyMatchingUUIDsForURL (path_url, 
-						   CPU_TYPE_ANY, 
-						   CPU_SUBTYPE_MULTIPLE);
+	  uuid_array = gdb_DBGCopyMatchingUUIDsForURL (path);
 	  if (uuid_array != NULL)
 	    CFDictionarySetValue (paths_and_uuids, path_url, uuid_array);
 	  
@@ -1034,6 +974,7 @@ locate_dsym_mach_in_bundle (CFUUIDRef uuid_ref, char *dsym_bundle_path)
 
 }
 
+#if USE_DEBUG_SYMBOLS_FRAMEWORK
 /* Locate a full path to the dSYM mach file within the dSYM bundle using
    OJBFILE's uuid and the DebugSymbols.framework. The DebugSymbols.framework 
    will used using the current set of global DebugSymbols.framework defaults 
@@ -1228,7 +1169,6 @@ macosx_locate_dsym (struct objfile *objfile)
 struct objfile *
 macosx_find_objfile_matching_dsym_in_bundle (char *dsym_bundle_path, char **out_full_path)
 {
-#if USE_DEBUG_SYMBOLS_FRAMEWORK
   CFMutableDictionaryRef paths_and_uuids;
   struct search_baton results;
   struct objfile *objfile;
@@ -1289,9 +1229,6 @@ macosx_find_objfile_matching_dsym_in_bundle (char *dsym_bundle_path, char **out_
  cleanup_and_return:
   CFRelease (paths_and_uuids);
   return out_objfile;
-#else
-  return NULL;
-#endif
 }
 
 /* Given a path to a kext bundle look in the Info.plist and retrieve
@@ -1814,7 +1751,6 @@ _initialize_macosx_tdep ()
 
   add_info ("trampoline", info_trampoline_command,
             "Resolve function for DYLD trampoline stub and/or Objective-C call");
-#if USE_CARBON_FRAMEWORK
   c = add_com ("open", class_support, open_command, _("\
 Open the named source file in an application determined by LaunchServices.\n\
 With no arguments, open the currently selected source file.\n\
@@ -1822,7 +1758,6 @@ Also takes file:line to hilight the file at the given line."));
   set_cmd_completer (c, filename_completer);
   add_com_alias ("op", "open", class_support, 1);
   add_com_alias ("ope", "open", class_support, 1);
-#endif /* #if USE_CARBON_FRAMEWORK  */
 
   add_com ("flushstack", class_maintenance, stack_flush_command,
            "Force gdb to flush its stack-frame cache (maintainer command)");

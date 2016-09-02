@@ -136,7 +136,8 @@ symtabs_and_lines decode_all_digits_exhaustive (char **argptr,
                                    char ***canonical,
                                    struct symtab *file_symtab,
                                    char *q,
-                                   int *parsed_lineno);
+				   int *parsed_lineno,
+				   int *not_found_ptr);
 
 static struct
 symtabs_and_lines decode_all_digits (char **argptr,
@@ -1267,7 +1268,8 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
 
             this_result = decode_all_digits_exhaustive (&start_here, 
                               funfirstline, default_symtab, default_line,
-                              canonical, file_symtab_arr[i], q, &parsed_lineno);
+			      canonical, file_symtab_arr[i], q, &parsed_lineno,
+			      not_found_ptr);
             if (this_result.nelts > 0)
               {
                 /* APPLE LOCAL: Only add the sal entries from this_result 
@@ -2261,10 +2263,11 @@ symtab_from_filename (char **argptr, char *p, int is_quote_enclosed,
 
 static struct symtabs_and_lines
 decode_all_digits_exhaustive (char **argptr, int funfirstline,
-		   struct symtab *default_symtab,
-		   int default_line, char ***canonical,
-		   struct symtab *file_symtab, char *q,
-		   int *parsed_lineno)
+			      struct symtab *default_symtab,
+			      int default_line, char ***canonical,
+			      struct symtab *file_symtab, char *q,
+			      int *parsed_lineno,
+			      int *not_found_ptr)
 
 {
   struct symtabs_and_lines values;
@@ -2453,7 +2456,21 @@ decode_all_digits_exhaustive (char **argptr, int funfirstline,
           if (func_sym)
             {
 	      struct symtab_and_line sal;
-              sal = find_function_start_sal (func_sym, 1);
+	      struct gdb_exception e;
+	      /* APPLE LOCAL: If we can't parse the prologue for some reason,
+		 make sure the breakpoint gets marked as "future".  */
+	      TRY_CATCH (e, RETURN_MASK_ALL)
+	      {
+		sal = find_function_start_sal (func_sym, 1);
+	      }
+
+	      if (e.reason != NO_ERROR)
+		{
+		  if (not_found_ptr)
+		    *not_found_ptr = 1;
+		  throw_exception (e);
+		}
+
               /* Don't move the line, just set the pc
                  to the right place. */
 	      /* Also, don't move the linenumber if the symtab's

@@ -104,6 +104,9 @@
    reduce the time taken to read a single byte, but reduce overall
    throughput.  */
 
+/* APPLE LOCAL: 6 works better on a remote touch device
+   than the original value of 5, as determined by empirical
+   testing.  */
 #define LINE_SIZE_POWER (6)
 #define LINE_SIZE (1 << LINE_SIZE_POWER)
 

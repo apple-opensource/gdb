@@ -134,11 +134,11 @@ case "$architecture_to_use" in
         gdb="${GDB_ROOT}/usr/libexec/gdb/gdb-i386-apple-darwin"
         ;;
     arm)
-        gdb="${GDB_ROOT}/usr/libexec/gdb/gdb-arm-apple-darwin8"
+        gdb="${GDB_ROOT}/usr/libexec/gdb/gdb-arm-apple-darwin"
         ;;
     armv6)
-        gdb="${GDB_ROOT}/usr/libexec/gdb/gdb-arm-apple-darwin8"
-        gdbopts="--osabi DarwinV6"
+        gdb="${GDB_ROOT}/usr/libexec/gdb/gdb-arm-apple-darwin"
+        osabiopts="--osabi DarwinV6"
         ;;
     *)
         echo "Unknown architecture '$architecture_to_use'; using 'ppc' instead.";
@@ -173,5 +173,5 @@ if [ -n "$requested_architecture" -a $translate_mode -eq 0 ]
 then
   exec $translate_binary "$gdb" --arch "$requested_architecture" "$@"
 else
-  exec $translate_binary "$gdb" "$@"
+  exec $translate_binary "$gdb" $osabiopts "$@"
 fi

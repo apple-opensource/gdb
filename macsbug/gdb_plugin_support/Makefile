@@ -108,6 +108,7 @@ OPT				=	-O2
 
 CFLAGS 				= 	-gdwarf-2		\
 					-D__DARWIN_UNIX03=0     \
+					-DTARGET_POWERPC        \
 					$(OPT)			\
 					-c			\
 					-w			\

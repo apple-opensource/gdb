@@ -1521,11 +1521,24 @@ varobj_update (struct varobj **varp, struct varobj_changelist **changelist)
     {
       int retval;
       (*varp)->error = 1;
-      if ((*varp)->root->in_scope)
-        retval = -3;
+      if ((*varp)->root->in_scope
+	  && type_changed != VAROBJ_TYPE_UNCHANGED)
+	{
+	  retval = -3;
+	  (*varp)->root->in_scope = 0;
+	}
+      else if (type_changed == VAROBJ_SCOPE_CHANGED)
+	{
+	  retval = -4;
+	  (*varp)->root->in_scope = 1;
+	}
+      else if (type_changed == VAROBJ_TYPE_UNCHANGED)
+	retval = 0;
       else
-        retval = 0;
-      (*varp)->root->in_scope = 0;
+	{
+	  retval = 0;
+	  (*varp)->root->in_scope = 0;
+	}
       return retval;
     }
   else
@@ -2064,6 +2077,8 @@ free_variable (struct varobj *var)
   xfree (var->path_expr);
   xfree (var->obj_name);
   xfree (var->dynamic_type_name);
+  if (var->value != NULL)
+    value_free (var->value);
   xfree (var);
 }
 
@@ -2411,6 +2426,50 @@ name_of_variable (struct varobj *var)
   return var->name;
 }
 
+/* APPLE LOCAL begin cast varobj root to dynamic type, if appropriate.  */
+
+/* Given a varobj that is a root, check to see if it has a dynamic type
+   (and if the language is one that allows type casting), and if so return
+   a path expr for the varobj that casts it to its dynamic type.  */
+static char *
+path_expr_of_root (struct varobj *var)
+{
+  char *path_expr = var->name;
+  char *dynamic_expr;
+  int dynamic_expr_len;
+  int root_name_len;
+
+  if (var->root->lang->language != vlang_cplus
+      && var->root->lang->language != vlang_c)
+    return path_expr;
+
+  if (varobj_use_dynamic_type != 0
+      && var->dynamic_type != NULL
+      && var->dynamic_type != var->type)
+    {
+      struct type *root_type = NULL;
+      int root_is_ptr;
+
+      root_type = get_type_deref (var, &root_is_ptr);
+      if (root_is_ptr)
+	{
+	  const char *format = "((%s *) (%s))";
+	  dynamic_expr = TYPE_NAME (root_type);
+	  dynamic_expr_len = strlen (dynamic_expr);
+	  if (dynamic_expr_len > 0)
+	    {
+	      root_name_len = strlen (var->name);
+	      path_expr = (char *) xmalloc (dynamic_expr_len + root_name_len +
+					    strlen (format) - 3);
+	      sprintf (path_expr, format, dynamic_expr, var->name);
+	    }
+	}
+    }
+
+  return path_expr;
+}
+/* APPLE LOCAL end cast varobj root to dynamic type, if appropriate.  */
+
 /* APPLE LOCAL begin */
 /* Returns a pointer to the full rooted expression of varobj VAR.
    If it has not been computed yet, this will compute it */
@@ -2418,11 +2477,14 @@ name_of_variable (struct varobj *var)
 static char *
 path_expr_of_variable (struct varobj *var)
 {
-  if (var->path_expr != NULL)
+  /* APPLE LOCAL begin cast varobj root to dynamic type, if appropriate.  */
+  if (var->path_expr != NULL
+      && (! is_root_p (var)))
     return var->path_expr;
   /* APPLE LOCAL is_root_p */
   else if (is_root_p (var))
-    return var->name;
+    return path_expr_of_root (var);
+  /* APPLE LOCAL end cast varobj root to dynamic type, if appropriate.  */
   else if (var->elide_in_expr)
     {
       if (CPLUS_FAKE_CHILD (var->parent))
@@ -2563,8 +2625,16 @@ value_of_root (struct varobj **var_handle, enum varobj_type_change *type_changed
 		 block...  Then we need to select the new varobj as well. */
 	      var->root->valid_block = tmp_var->root->valid_block;
 	    }
-	  varobj_delete (tmp_var, NULL, 0);
-	  *type_changed = VAROBJ_TYPE_UNCHANGED;
+	  if (tmp_var->root->in_scope 
+	      && !var->root->in_scope)
+	    {
+	      *type_changed = VAROBJ_SCOPE_CHANGED;
+	    }
+	  else
+	    {
+	      varobj_delete (tmp_var, NULL, 0);
+	      *type_changed = VAROBJ_TYPE_UNCHANGED;
+	    }
 	}
       else
 	{

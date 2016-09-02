@@ -465,7 +465,7 @@ struct protocol_log_entry {
   char packet[PROTOCOL_LOG_BUFSIZE];
 };
 
-#define PROTOCOL_LOG_COUNT 200
+#define PROTOCOL_LOG_COUNT 400
 struct protocol_log {
   int head;
   struct protocol_log_entry ents[PROTOCOL_LOG_COUNT];
@@ -498,6 +498,12 @@ static void
 add_pkt_to_protocol_log (const char *p, enum pkt_direction direction)
 {
   struct protocol_log_entry *cur = &protocol_log.ents[protocol_log.head];
+
+  /* For an empty packet (e.g. an empty response indicating an unrecognized
+     request), add a single space character.  We use zero-length entries to 
+     indicate unused slots.  */
+  if (p[0] == '\0')
+    p = " ";
   strncpy (cur->packet, p, PROTOCOL_LOG_BUFSIZE - 1);
   cur->packet[PROTOCOL_LOG_BUFSIZE - 1] = '\0';
   cur->direction = direction;
@@ -2732,30 +2738,80 @@ remote_open_1 (char *name, int from_tty, struct target_ops *target,
   
 /* APPLE LOCAL Implementation of remote_create_inferior and remote_attach.  */
 
+/* We printf lengths & index's.  We need to know what size to allocate for them.
+   20 is the length of 0xffffffffffffffff as an int.  Probably big enough.  */
+#define INT_PRINT_MAX 20
 void
 remote_create_inferior (char *exec_file, char *allargs, char **env, int from_tty)
 {
-  /* We send the 'A' packet to specify the target to run.  Note that
-     we don't get an argument array, so I'm just going to send the
-     exec as argv[0] and all the rest as argv[1].  I give 12
-     characters for each number, that's generous.  */
   struct remote_state *rs = get_remote_state ();
   char *buf = alloca (rs->remote_packet_size);
-  char *args_pkt;
+  char *pkt_buffer;
   int exec_len;
   int args_len;
   int argnum;
+  int print_len;
   int i;
   char *ptr;
   char hexval[3];
   char **argv;
   int argc;
-  struct cleanup *argv_cleanup;
+  struct cleanup *pkt_cleanup;
   char *remote_exec_file;
+  static const char *env_pkt_hdr = "QEnvironment:";
+  int envnum;
+  int packet_len;
+  int max_size;
+  
+  /* First send down the environment array. 
+     We are using a packet of the form:
+         QEnvironment[,<LEN>,<ENV_ELEM>]...
+     where the ENV_ELEM is a hex-encoded form of the FOO=BAR entry that gdb passes in, and
+     LEN is the length of the hex-encoded form.  */
+  
+  envnum = 0;
+  max_size = 0;
+  pkt_cleanup = NULL;
+
+  while (env[envnum] != NULL)
+    {
+        packet_len = strlen (env_pkt_hdr) +  strlen(env[envnum]) + 1;
+
+	if (packet_len > rs->remote_packet_size)
+	  {
+	    warning ("Environment variable too long, skipping: %s", env[envnum]);
+	    continue;
+	  }
+
+	if (packet_len > max_size)
+	  {
+	    if (pkt_cleanup != NULL)
+	      do_cleanups (pkt_cleanup);
+	    pkt_buffer = (char *) xmalloc (packet_len);
+	    max_size = packet_len;
+	    pkt_cleanup = make_cleanup (xfree, pkt_buffer);
+	  }
+
+	snprintf (pkt_buffer, packet_len, "%s%s", env_pkt_hdr, env[envnum]);
+	putpkt (pkt_buffer);
+
+	getpkt (buf, rs->remote_packet_size, 0);
+	if (buf[0] == 'E')
+	  error ("Got an error \"%s\" sending environment to remote.", buf);
+	else if (buf[0] != '\0' && (buf[0] != 'O' && buf[1] != 'K'))
+	  error ("Unknown packet reply: \"%s\" to environment packet.", buf);
+	
+	envnum++;
+    }
+
+  if (pkt_cleanup != NULL)
+    do_cleanups (pkt_cleanup);
+
+  /* Next send down the arguments.  */
 
   /* The largest possible array - every character is a separate argument.  */
   argv = (char **) xmalloc (((strlen (allargs) + 1) / (unsigned) 2 + 2) * sizeof (*argv));
-  argv_cleanup = make_cleanup (xfree, argv);
+  pkt_cleanup = make_cleanup (xfree, argv);
   breakup_args (allargs, &argc, argv);
 
   if (remote_exec_dir == NULL || remote_exec_dir[0] == '\0')
@@ -2776,11 +2832,11 @@ remote_create_inferior (char *exec_file, char *allargs, char **env, int from_tty
      argument we won't include the spaces...  */
   args_len = strlen (allargs);
   
-  args_pkt = xmalloc (1 + 12 + 1 + 12 + 1 + 2 * exec_len 
-		      + argc * (1 + 12 + 1 + 12 + 1) + 2 * args_len + 1);
-  make_cleanup (xfree, args_pkt);
-  sprintf (args_pkt, "A%d,0,", 2 * exec_len);
-  ptr = args_pkt + strlen (args_pkt);
+  pkt_buffer = xmalloc (1 + INT_PRINT_MAX + 1 + INT_PRINT_MAX + 1 + 2 * exec_len 
+		      + argc * (1 + INT_PRINT_MAX + 1 + INT_PRINT_MAX + 1) + 2 * args_len + 1);
+  make_cleanup (xfree, pkt_buffer);
+  print_len = snprintf (pkt_buffer, INT_PRINT_MAX + 5, "A%d,0,", 2 * exec_len);
+  ptr = pkt_buffer + print_len;
 
   for (i = 0; i < exec_len; i++)
     {
@@ -2794,8 +2850,8 @@ remote_create_inferior (char *exec_file, char *allargs, char **env, int from_tty
       int arglen = strlen (arg);
       *ptr++ = ',';
       *ptr = '\0';
-      sprintf (ptr, "%d,%d,", 2 * arglen, argnum + 1);
-      ptr += strlen (ptr);
+      print_len = snprintf (ptr, 2 * INT_PRINT_MAX + 3, "%d,%d,", 2 * arglen, argnum + 1);
+      ptr += print_len;
       for (i = 0; i < arglen; i++)
 	{
 	  snprintf (hexval, sizeof (hexval), "%02hhx", arg[i]);
@@ -2804,12 +2860,12 @@ remote_create_inferior (char *exec_file, char *allargs, char **env, int from_tty
 	}
     }
   *ptr = '\0';
-  putpkt (args_pkt);
-  do_cleanups (argv_cleanup);
+  putpkt (pkt_buffer);
+  do_cleanups (pkt_cleanup);
 
   getpkt (buf, rs->remote_packet_size, 0);
   if (buf[0] == 'E')
-    error ("Got an error sending arguments to remote.");
+    error ("Got an error \"%s\" sending arguments to remote.", buf);
   else if (buf[0] != 'O' && buf[1] != 'K')
     error ("Unknown packet reply: \"%s\" to remote arguments packet.", buf);
 

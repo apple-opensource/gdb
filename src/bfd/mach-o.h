@@ -110,7 +110,9 @@ typedef enum bfd_mach_o_load_command_type
   BFD_MACH_O_LC_RPATH = 0x1c | BFD_MACH_O_LC_REQ_DYLD,  
   BFD_MACH_O_LC_CODE_SIGNATURE = 0x1d,   
   BFD_MACH_O_LC_SEGMENT_SPLIT_INFO = 0x1e, 
-  BFD_MACH_O_LC_REEXPORT_DYLIB = 0x1f | BFD_MACH_O_LC_REQ_DYLD
+  BFD_MACH_O_LC_REEXPORT_DYLIB = 0x1f | BFD_MACH_O_LC_REQ_DYLD,
+  BFD_MACH_O_LC_LAZY_LOAD_DYLIB = 0x20,  /* delay load of dylib until first use */
+  BFD_MACH_O_LC_ENCRYPTION_INFO = 0x21   /* encrypted segment information */
 }
 bfd_mach_o_load_command_type;
 
@@ -513,7 +515,7 @@ typedef struct mach_o_data_struct
   bfd_mach_o_section **sections;
   bfd *ibfd;
   unsigned char uuid[16];
-  unsigned char scanning_load_cmds;
+  int scanning_load_cmds;
 }
 mach_o_data_struct;
 

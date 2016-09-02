@@ -117,15 +117,16 @@ char *dyld_fix_path (char *path);
 void macosx_set_malloc_inited (int new_val);
 int macosx_get_malloc_inited (void);
 struct section_offsets *get_sectoffs_for_shared_cache_dylib (struct dyld_objfile_entry *, CORE_ADDR);
-
-int target_read_mach_header (CORE_ADDR addr, 
-			     struct mach_header *mh);
-int target_read_load_command (CORE_ADDR addr, 
-				     struct load_command *load_cmd);
+int target_read_mach_header (CORE_ADDR addr,
+                            struct mach_header *mh);
+int target_read_load_command (CORE_ADDR addr,
+                                    struct load_command *load_cmd);
 int target_read_uuid (CORE_ADDR addr, unsigned char *uuid);
-				     
+
 /* From macosx-nat-dyld.c.  */
 extern struct cmd_list_element *setshliblist;
-extern struct cmd_list_element *showshliblist;				    
+extern struct cmd_list_element *showshliblist;
+
+
 
 #endif /* __GDB_MACOSX_NAT_DYLD_H__ */

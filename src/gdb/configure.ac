@@ -833,10 +833,6 @@ case "$host" in
 esac
 
 case "$host" in
-  arm-apple-*)
-  # There is a Carbon for ARM, but we don't want to use it due to many differences
-  # the full version of Carbon.
-  ;;
   *-apple-darwin* | *-apple-macos*)
     AC_ARG_ENABLE(carbon-framework,
     [AC_HELP_STRING([--disable-carbon-framework],[disable Carbon framework use even when available])],
@@ -846,7 +842,7 @@ case "$host" in
       *)
         AC_MSG_ERROR([bad value '$enableval' for --disable-carbon-framework]) ;;
     esac],
-    [enable_carbon_framework=yes])
+    [enable_carbon_framework=no])
 
     AC_MSG_CHECKING([for Carbon framework])
     if test x"$enable_carbon_framework" = xyes; then
@@ -1316,20 +1312,6 @@ AC_ARG_WITH(sysroot,
 ])
 AC_SUBST(TARGET_SYSTEM_ROOT)
 AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
-
-case "$host" in
-  *-apple-darwin* | *-apple-macos*)
-  AC_MSG_CHECKING([for CoreFoundation framework])
-  if test -d ${TARGET_SYSTEM_ROOT}/System/Library/Frameworks/CoreFoundation.framework
-  then
-    COREFOUNDATION_LIBS="-framework CoreFoundation"
-    AC_MSG_RESULT(yes)
-  else
-    AC_MSG_RESULT(no)
-  fi
-  ;;
-esac
-AC_SUBST(COREFOUNDATION_LIBS)
 
 # NOTE: Don't add -Wall or -Wunused, they both include
 # -Wunused-parameter which reports bogus warnings.

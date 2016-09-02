@@ -270,13 +270,18 @@ macosx_clear_start_breakpoint (void)
 int
 target_is_remote ()
 {
-  if (strstr (current_target.to_shortname, "remote") == NULL)
+  if (strstr (current_target.to_shortname, "remote") == NULL
+      && strstr (current_target.to_shortname, "async") == NULL)
     return 0;
   if (strcmp (current_target.to_shortname, "remote"))
     return 1;
   if (strcmp (current_target.to_shortname, "remote-mobile"))
     return 1;
   if (strcmp (current_target.to_shortname, "extended-remote"))
+    return 1;
+  if (strcmp (current_target.to_shortname, "extended-async"))
+    return 1;
+  if (strcmp (current_target.to_shortname, "async"))
     return 1;
 
   return 0;
@@ -657,17 +662,18 @@ dyld_starts_here_p (mach_vm_address_t addr)
   else if (mh->magic == MH_MAGIC)
     {
       if (exec_bfd 
-	  && gdbarch_lookup_osabi_from_bfd (exec_bfd) == GDB_OSABI_DARWIN64)
+	  && gdbarch_lookup_osabi_from_bfd (exec_bfd) != GDB_OSABI_DARWIN
+	  && gdbarch_lookup_osabi_from_bfd (exec_bfd) != GDB_OSABI_DARWINV6)
 	  {
 	    error ("The exec file is 64 bits but the attach target is 32 bits.\n"
 	      "Quit gdb & restart, using \"--arch\" to select the 32 bit fork of the executable.");
-	      }
+	  }
     }
 
   ret = vm_deallocate (mach_task_self (), data, data_count);
 
-#endif /* NM_NEXTSTEP */
   return 1;
+#endif /* NM_NEXTSTEP */
 }
 
 /* Tries to find the name string for the dynamic linker passed as

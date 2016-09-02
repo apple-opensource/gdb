@@ -101,6 +101,7 @@ inferior_read_memory_partial (CORE_ADDR addr, int nbytes, gdb_byte *mbuf)
   int error = 0;
 
   volatile struct gdb_exception except;
+
   int old_trust_readonly = set_trust_readonly (0);
   TRY_CATCH (except, RETURN_MASK_ERROR)
     {
@@ -109,6 +110,7 @@ inferior_read_memory_partial (CORE_ADDR addr, int nbytes, gdb_byte *mbuf)
 				 mbuf, addr, nbytes);
     }
   set_trust_readonly (old_trust_readonly);
+
   if (nbytes_read == 0)
     {
       /* Set the bfd error if we didn't get anything.  */
@@ -173,13 +175,18 @@ inferior_read_mach_o (bfd *abfd, void *stream, void *data, file_ptr nbytes, file
     mdata = abfd->tdata.mach_o_data;
     if (mdata->scanning_load_cmds == 1)
       {
-	bfd_set_error (bfd_error_invalid_target);
-	return 0;
+       bfd_set_error (bfd_error_invalid_target);
+       return 0;
       }
 
     for (i = 0; i < mdata->header.ncmds; i++)
       {
         struct bfd_mach_o_load_command *cmd = &mdata->commands[i];
+	/* Break out of the loop if we find any zero load commands
+	   since this can happen if we are currently reading the
+	   load commands.  */
+	if (cmd->type == 0)
+	  break;
         if (cmd->type == BFD_MACH_O_LC_SEGMENT
 	    || cmd->type == BFD_MACH_O_LC_SEGMENT_64)
           {
@@ -268,6 +275,7 @@ inferior_read (bfd *abfd, void *stream, void *data, file_ptr nbytes, file_ptr of
          binary.  */
       bytes_read = inferior_read_mach_o (abfd, stream, data, nbytes, offset);
     }
+
   if (bytes_read == 0)
     bytes_read = inferior_read_generic (abfd, stream, data, nbytes, offset);
   return bytes_read;

@@ -921,8 +921,8 @@ target_section_by_addr (struct target_ops *target, CORE_ADDR addr)
    value are just as for target_xfer_partial.  */
 
 static LONGEST
-memory_xfer_partial (struct target_ops *ops, void *readbuf, const void *writebuf,
-		     ULONGEST memaddr, LONGEST len)
+memory_xfer_partial (struct target_ops *ops, void *readbuf, 
+                     const void *writebuf, ULONGEST memaddr, LONGEST len)
 {
   LONGEST res;
   int reg_len;
@@ -1254,14 +1254,14 @@ target_read (struct target_ops *ops,
       if (xfer == 0)
  	return xfered;
       /* APPLE LOCAL: Don't return -1 here if we managed to get some
-	 bytes.  Return the number of bytes we got.  */
+        bytes.  Return the number of bytes we got.  */
       if (xfer < 0)
-	{
-	  if (xfered == 0)
-	    return -1;
-	  else
-	    return xfered;
-	}
+        {
+          if (xfered == 0)
+            return -1;
+          else
+            return xfered;
+        }
       /* END APPLE LOCAL  */
       xfered += xfer;
       QUIT;

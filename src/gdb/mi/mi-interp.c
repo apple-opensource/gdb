@@ -347,7 +347,7 @@ mi_cmd_interpreter_exec (char *command, char **argv, int argc)
       add_continuation (mi_interpreter_exec_continuation,
                         (void *) cont_args);
     }  
-  
+
   return result;
 }
 

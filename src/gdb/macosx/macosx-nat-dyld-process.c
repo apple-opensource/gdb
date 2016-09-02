@@ -23,7 +23,6 @@
 
 #include "defs.h"
 #include "inferior.h"
-#include "symfile.h"
 #include "symtab.h"
 #include "gdbcmd.h"
 #include "objfiles.h"
@@ -1116,7 +1115,7 @@ dyld_load_library_from_memory (const struct dyld_path_info *d,
 }
 
 /* dyld_load_library opens the bfd for the library in E, and
-   sets some state in E.   */
+   sets some state in E.  */
 
 void
 dyld_load_library (const struct dyld_path_info *d,
@@ -1838,23 +1837,11 @@ dyld_is_objfile_loaded (struct objfile *obj)
   if (obj->syms_only_objfile == 1)
     return 1;
 
-  /* Another problem is that since we don't consider anything mapped till
-     we get the first dyld notification, we won't set any breakpoints
-     in the main executable before dyld runs (notably _start), and we won't
-     hit any breakpoints in the early parts of the dyld code either.  
-     To work around this, we ALWAYS consider the symfile_objfile loaded, and
-     always consider dyld loaded. 
-     The reason for this whole exercise was to make sure breakpoints in a
-     shared library didn't overwrite the dyld area for the main executable.
-     So considering the executable always mapped is fine.
-     We are adding the possibility that if somebody builds a dyld based at
-     0x0 and then sets a breakpoint early on, they will run into the
-     bug again.  But there are a small number of people in the world who
-     debug dyld itself, and they can learn to always base dyld somewhere 
-     above the executable if they want to avoid this problem.  */
-
-  if (obj == symfile_objfile)
-    return 1;
+  /* Another problem is that since we don't consider anything mapped
+     till we get the first dyld notification, we won't set any
+     breakpoints in dyld and so and we won't hit any breakpoints in
+     the early parts of the dyld code.
+     To work around this, we ALWAYS consider dyld loaded. */
 
   if (bfd_hash_lookup (&obj->obfd->section_htab, "LC_ID_DYLINKER", 0, 0) != NULL)
     return 1;

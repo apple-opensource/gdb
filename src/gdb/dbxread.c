@@ -662,22 +662,22 @@ dbx_symfile_read (struct objfile *objfile, int mainline)
     {
       /* APPLE LOCAL shared cache end.  */
       if (((OBJF_SYM_LEVELS_MASK & objfile->symflags) != OBJF_SYM_ALL)
-	  && (objfile->symflags & OBJF_SYM_EXTERN
-	      || objfile->symflags & OBJF_SYM_CONTAINER)
-	  && (OBJF_SYM_LEVELS_MASK & (objfile->symflags & ~OBJF_SYM_LOCAL))
-	  && (OBJF_SYM_LEVELS_MASK & (objfile->symflags & ~OBJF_SYM_DEBUG))
-	  && DBX_LOCAL_STAB_COUNT (objfile) != 0 
-	  && DBX_NONLOCAL_STAB_COUNT (objfile) != 0
-	  && !objfile_contains_objc (objfile))
-	{
-	  dbx_symtab_offset = DBX_NONLOCAL_STAB_OFFSET (objfile);
-	  dbx_symtab_count = DBX_NONLOCAL_STAB_COUNT (objfile);
-	}
+         && (objfile->symflags & OBJF_SYM_EXTERN
+             || objfile->symflags & OBJF_SYM_CONTAINER)
+         && (OBJF_SYM_LEVELS_MASK & (objfile->symflags & ~OBJF_SYM_LOCAL))
+         && (OBJF_SYM_LEVELS_MASK & (objfile->symflags & ~OBJF_SYM_DEBUG))
+         && DBX_LOCAL_STAB_COUNT (objfile) != 0
+         && DBX_NONLOCAL_STAB_COUNT (objfile) != 0
+         && !objfile_contains_objc (objfile))
+       {
+         dbx_symtab_offset = DBX_NONLOCAL_STAB_OFFSET (objfile);
+         dbx_symtab_count = DBX_NONLOCAL_STAB_COUNT (objfile);
+       }
       else
-	{
-	  dbx_symtab_offset = DBX_SYMTAB_OFFSET (objfile);
-	  dbx_symtab_count = DBX_SYMCOUNT (objfile);
-	}
+       {
+         dbx_symtab_offset = DBX_SYMTAB_OFFSET (objfile);
+         dbx_symtab_count = DBX_SYMCOUNT (objfile);
+       }
     }
 
   val = bfd_seek (sym_bfd, dbx_symtab_offset, SEEK_SET);

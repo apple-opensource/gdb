@@ -39,6 +39,7 @@
 #include "inlining.h"
 #include "objfiles.h"
 #include "gdbthread.h"
+#include "complaints.h"
 
 extern int addressprint;
 
@@ -1618,6 +1619,17 @@ inlined_function_add_function_names (struct objfile *objfile,
   struct rb_tree_node_list *next;
   int found = 0;
 
+  if (! fn_name)
+    fn_name = xstrdup ("<unknown function>");
+  if (!calling_fn_name)
+    calling_fn_name = xstrdup ("<unknown function>");
+
+  if ((strcmp (fn_name, "<unknown function>") == 0)
+      || (strcmp (calling_fn_name, "<unknown function>") == 0))
+    complaint (&symfile_complaints, 
+ _("Missing inlined function names:  %s calling %s, at line %d (address %Ld)"), 
+	       calling_fn_name, fn_name, line, low_pc);
+
   rb_tree_find_all_matching_nodes (objfile->inlined_subroutine_data,
 				   low_pc, 0, high_pc,
 				   &matches);
@@ -2861,6 +2873,23 @@ inlined_subroutine_free_objfile_data (struct rb_tree_node *root)
     inlined_subroutine_free_objfile_data (root->right);
 
   data = (struct inlined_call_stack_record *) root->data;
+  if (data->ranges)
+    xfree (data->ranges);
+  xfree (root->data);
+  xfree (root);
+}
+
+void
+inlined_subroutine_free_objfile_call_sites (struct rb_tree_node *root)
+{
+  struct dwarf_inlined_call_record *data;
+  if (root->left)
+    inlined_subroutine_free_objfile_call_sites (root->left);
+
+  if (root->right)
+    inlined_subroutine_free_objfile_call_sites (root->right);
+
+  data = (struct dwarf_inlined_call_record *) root->data;
   if (data->ranges)
     xfree (data->ranges);
   xfree (root->data);

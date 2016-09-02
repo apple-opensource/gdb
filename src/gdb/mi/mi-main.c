@@ -178,10 +178,10 @@ static long system_diff (struct mi_timestamp *start, struct mi_timestamp *end);
 static void start_remote_counts (struct mi_timestamp *tv, const char *token);
 static void end_remote_counts (struct mi_timestamp *tv);
 
-/* When running a synchronous target, we would like to have interpreter-exec
-   give the same output as for an asynchronous one.  Use this to tell us that
-   it did run so we can fake up the output.  */
-int mi_interp_exec_cmd_did_run;
+ /* When running a synchronous target, we would like to have interpreter-exec
+    give the same output as for an asynchronous one.  Use this to tell us that
+    it did run so we can fake up the output.  */
+ int mi_interp_exec_cmd_did_run;
 
 /* Command implementations. FIXME: Is this libgdb? No.  This is the MI
    layer that calls libgdb.  Any operation used in the below should be
@@ -1739,7 +1739,7 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
 	current_command_ts = context->cmd_start;
 
       /* Set this to 0 so we don't mistakenly think this command
-	 caused the target to run under interpreter-exec.  */
+        caused the target to run under interpreter-exec.  */
       mi_interp_exec_cmd_did_run = 0;
       args->rc = mi_cmd_execute (context);
 
@@ -1758,18 +1758,18 @@ captured_mi_execute_command (struct ui_out *uiout, void *data)
         }
       
       if (!target_can_async_p () && mi_interp_exec_cmd_did_run)
-	{
-	  fputs_unfiltered ("(gdb) \n", raw_stdout);
-	  gdb_flush (raw_stdout);
-	  if (current_command_token)
-	    {
-	      fputs_unfiltered (current_command_token, raw_stdout);
-	    }
-	  fputs_unfiltered ("*stopped", raw_stdout);
-	  mi_out_put (saved_uiout, raw_stdout);
-	  mi_out_rewind (saved_uiout);
-	  fputs_unfiltered ("\n", raw_stdout);
-	}
+        {
+          fputs_unfiltered ("(gdb) \n", raw_stdout);
+          gdb_flush (raw_stdout);
+          if (current_command_token)
+            {
+              fputs_unfiltered (current_command_token, raw_stdout);
+            }
+          fputs_unfiltered ("*stopped", raw_stdout);
+          mi_out_put (saved_uiout, raw_stdout);
+          mi_out_rewind (saved_uiout);
+          fputs_unfiltered ("\n", raw_stdout);
+        }
       else if (!target_can_async_p () || !target_executing
 	  || mi_command_completes_while_target_executing (context->command))
 	{
@@ -2423,7 +2423,7 @@ mi_interpreter_exec_bp_cmd (char *command, char **argv, int argc)
    instance, with console-quoted). */
 
 static void
-route_output_through_mi (const char *prefix, const char *notification)
+route_output_through_mi (char *prefix, char *notification)
 {
   static struct ui_file *rerouting_ui_file = NULL;
 

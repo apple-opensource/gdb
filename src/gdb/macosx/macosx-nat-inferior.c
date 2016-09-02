@@ -55,6 +55,7 @@
 #include <ctype.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
+#include <sys/proc.h>
 #include <mach/mach_error.h>
 
 #include "macosx-nat-dyld.h"
@@ -150,6 +151,17 @@ struct macosx_pending_event
   struct macosx_pending_event *prev;
 };
 
+/* A list of processes already running at gdb-startup with the same
+   name.  Used for the "-waitfor" command line option so we can ignore
+   existing zombies/running copies of the process/etc and detect a newly
+   launched version.  */
+
+struct pid_list
+{
+  int count;
+  pid_t *pids;
+};
+
 struct macosx_pending_event *pending_event_chain, *pending_event_tail;
 
 static void (*async_client_callback) (enum inferior_event_type event_type,
@@ -221,6 +233,9 @@ static void macosx_child_files_info (struct target_ops *ops);
 static char *macosx_pid_to_str (ptid_t tpid);
 
 static int macosx_child_thread_alive (ptid_t tpid);
+
+static struct pid_list *find_existing_processes_by_name (const char *procname);
+static int pid_present_on_pidlist (pid_t pid, struct pid_list *proclist);
 
 static void
 macosx_handle_signal (macosx_signal_thread_message *msg,
@@ -1085,10 +1100,10 @@ macosx_check_new_threads (thread_array_t thread_list, unsigned int nthreads)
 static void
 macosx_child_stop (void)
 {
-  extern pid_t inferior_process_group;
+  pid_t pid = PIDGET (inferior_ptid);
   int ret;
 
-  ret = kill (inferior_process_group, SIGINT);
+  ret = kill (pid, SIGINT);
 }
 
 static void
@@ -1263,7 +1278,8 @@ macosx_fetch_task_info (struct kinfo_proc **info, size_t * count)
 }
 
 char **
-macosx_process_completer_quoted (char *text, char *word, int quote)
+macosx_process_completer_quoted (char *text, char *word, int quote, 
+                                 struct pid_list *ignorepids)
 {
   struct kinfo_proc *proc = NULL;
   size_t count, i, found = 0;
@@ -1285,6 +1301,11 @@ macosx_process_completer_quoted (char *text, char *word, int quote)
     {
       /* classic-inferior-support */
       if (!can_attach (proc[i].kp_proc.p_pid))
+        continue;
+      if (pid_present_on_pidlist (proc[i].kp_proc.p_pid, ignorepids))
+        continue;
+      /* Skip zombie processes */
+      if (proc[i].kp_proc.p_stat == SZOMB || proc[i].kp_proc.p_stat == 0)
         continue;
       char *temp =
         (char *) xmalloc (strlen (proc[i].kp_proc.p_comm) + 1 + 16);
@@ -1332,11 +1353,12 @@ macosx_process_completer_quoted (char *text, char *word, int quote)
 char **
 macosx_process_completer (char *text, char *word)
 {
-  return macosx_process_completer_quoted (text, word, 1);
+  return macosx_process_completer_quoted (text, word, 1, NULL);
 }
 
 static void
-macosx_lookup_task_local (char *pid_str, int pid, task_t * ptask, int *ppid)
+macosx_lookup_task_local (char *pid_str, int pid, task_t * ptask, int *ppid,
+                          struct pid_list *ignorepids)
 {
   CHECK_FATAL (ptask != NULL);
   CHECK_FATAL (ppid != NULL);
@@ -1360,7 +1382,8 @@ macosx_lookup_task_local (char *pid_str, int pid, task_t * ptask, int *ppid)
   else
     {
       struct cleanup *cleanups = NULL;
-      char **ret = macosx_process_completer_quoted (pid_str, pid_str, 0);
+      char **ret = macosx_process_completer_quoted (pid_str, pid_str, 0, 
+                                                    ignorepids);
       char *tmp = NULL;
       char *tmp2 = NULL;
       unsigned long lpid = 0;
@@ -1420,7 +1443,7 @@ macosx_lookup_task_local (char *pid_str, int pid, task_t * ptask, int *ppid)
    include the pathname of the process.  */
 
 static void
-wait_for_process_by_name (const char *procname)
+wait_for_process_by_name (const char *procname, struct pid_list *ignorepids)
 {
   struct kinfo_proc *proc = NULL;
   size_t count, i;
@@ -1436,6 +1459,8 @@ wait_for_process_by_name (const char *procname)
       macosx_fetch_task_info (&proc, &count);
       for (i = 0; i < count; i++)
         {
+          if (pid_present_on_pidlist (proc[i].kp_proc.p_pid, ignorepids))
+            continue;
           if (strncmp (proc[i].kp_proc.p_comm, procname, MAXCOMLEN) == 0)
             {
               xfree (proc);
@@ -1447,12 +1472,65 @@ wait_for_process_by_name (const char *procname)
     }
 }
 
+/* -waitfor should ignore any processes by name that are already
+   up & running -- we want to attach to the first newly-launched
+   process.  So we begin by creating a list of all processes
+   with that name that are executing/zombied/etc.  
+   This function returns an xmalloc'ed array - the caller is 
+   responsible for freeing it.  
+   NULL is returned if there are no matching processes. */
+
+static struct pid_list *
+find_existing_processes_by_name (const char *procname)
+{
+  struct kinfo_proc *proc = NULL;
+  struct pid_list *pidlist;
+  size_t count, i;
+  int matching_processes, j;
+
+  macosx_fetch_task_info (&proc, &count);
+  for (i = 0, matching_processes = 0; i < count; i++)
+    if (strncmp (proc[i].kp_proc.p_comm, procname, MAXCOMLEN) == 0)
+      matching_processes++;
+  if (matching_processes == 0)
+    {
+      xfree (proc);
+      return NULL;
+    }
+
+  pidlist = (struct pid_list *) xmalloc (sizeof (struct pid_list));
+  pidlist->count = matching_processes;
+  pidlist->pids = (pid_t *) xmalloc (sizeof (pid_t) * matching_processes);
+  
+  for (i = 0, j = 0; i < count; i++)
+    if (strncmp (proc[i].kp_proc.p_comm, procname, MAXCOMLEN) == 0)
+      pidlist->pids[j++] = proc[i].kp_proc.p_pid;
+
+  xfree (proc);
+  return pidlist;
+}
+
+/* Returns 1 if PID is present on PROCLIST. 
+   0 if PID is not present or PROCLIST is empty.  */
+
 static int
-macosx_lookup_task (char *args, task_t * ptask, int *ppid)
+pid_present_on_pidlist (pid_t pid, struct pid_list *proclist)
+{
+  int i;
+  if (proclist == NULL)
+    return 0;
+  for (i = 0; i < proclist->count ; i++)
+    if (proclist->pids[i] == pid)
+      return 1;
+  return 0;
+}
+
+static int
+macosx_lookup_task (char *args, task_t *ptask, int *ppid)
 {
   char *pid_str = NULL;
   char *tmp = NULL;
-
+  struct pid_list *ignorepids = NULL; /* processes to ignore */
   struct cleanup *cleanups = NULL;
   char **argv = NULL;
   unsigned int argc;
@@ -1496,7 +1574,13 @@ macosx_lookup_task (char *args, task_t * ptask, int *ppid)
            pid_str = argv[1];
            if (strlen (pid_str) > MAXCOMLEN)
              pid_str[MAXCOMLEN] = '\0';
-           wait_for_process_by_name (pid_str);
+           ignorepids = find_existing_processes_by_name (pid_str);
+           if (ignorepids)
+             {
+               make_cleanup (xfree, ignorepids->pids);
+               make_cleanup (xfree, ignorepids);
+             }
+           wait_for_process_by_name (pid_str, ignorepids);
 	   break;
         }
     default:
@@ -1516,7 +1600,7 @@ macosx_lookup_task (char *args, task_t * ptask, int *ppid)
       pid = lpid;
     }
 
-  macosx_lookup_task_local (pid_str, pid, ptask, ppid);
+  macosx_lookup_task_local (pid_str, pid, ptask, ppid, ignorepids);
 
   do_cleanups (cleanups);
   return 0;
@@ -1685,15 +1769,52 @@ macosx_child_attach (char *args, int from_tty)
 	}
     }
 
-  /* I don't have any good way to know whether the malloc library
-     has been initialized yet.  But I'm going to guess that we are
-     unlikely to be able to attach BEFORE then...  */
-  macosx_set_malloc_inited (1);
-
   if (inferior_auto_start_dyld_flag)
     {
       macosx_solib_add (NULL, 0, NULL, 0);
     }
+
+  /* I don't have any good way to know whether the malloc library
+     has been initialized yet.  But I'm going to guess that we are
+     unlikely to be able to attach BEFORE then...  */
+  /* BUT sometimes we get a process that has been stopped at the
+     first instruction when launched so we can attach to it.  In
+     that case, we know that malloc hasn't been inited.  We had
+     better not set malloc inited in that case, or somebody will
+     try to call a function that does malloc, and we will corrupt
+     the target.
+
+     Note, we don't know what the "first instruction is" we are just
+     relying on the fact that it's currently _dyld_start.  Yecch...
+     But I can't think of anything better to do.  */
+  {
+    extern char *dyld_symbols_prefix;
+    int result;
+    char *name;
+    CORE_ADDR addr;
+
+    result = find_pc_partial_function (stop_pc, &name, &addr, NULL);
+    if (result != 0)
+      {
+	char *decorated_dyld_start;
+	decorated_dyld_start = xmalloc ( strlen ("_dyld_start") 
+				   + strlen (dyld_symbols_prefix) + 1);
+	sprintf (decorated_dyld_start, "%s_dyld_start", dyld_symbols_prefix);
+	/* I also check to make sure we're not too far away from
+	   _dyld_start, in case dyld gets stripped and there are a
+	   bunch of functions after dyld_start that don't have
+	   symbols.  */
+	if (strcmp (name, decorated_dyld_start) != 0
+	    || stop_pc - addr > 30 )
+	  {
+	    macosx_set_malloc_inited (1);
+	  }
+	xfree (decorated_dyld_start);
+      }
+    else
+      macosx_set_malloc_inited (1);
+
+  }  
 }
 
 static void

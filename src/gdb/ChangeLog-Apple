@@ -1,3 +1,152 @@
+2008-03-27  Jim Ingham  <jingham@apple.com>
+
+	* objfiles.c (free_objfile_internal): Free the cached sections
+	data structures.
+	* symtab.c: Use INVALID_ADDRESS to indicate uninitialized values
+	instead of 0.
+	(symtab_clear_cached_lookup_values): Ditto.
+
+2003-03-27  Caroline Tice  <ctice@apple.com>
+
+	* c-exp.y (square_bracket_seen): New global variable.
+	(yylex):  Make special cases for '[' and ']', to update 
+	square_bracket_seen; only call lookup_objc_class if square_bracket_seen
+	is true; then set it to false.
+	* objc-exp.y (square_bracket_seen): New global variable.
+	(yylex):  Make special cases for '[' and ']', to update 
+	square_bracket_seen; only call lookup_objc_class if square_bracket_seen
+	is true; then set it to false.
+	* varobj.c (path_expr_of_root):  New function.
+	(name_of_variable):  Call path_expr_of_root to get the path expression
+	for root variables, instead of just returning its name.
+
+2003-03-26  Jim Ingham  <jingham@apple.com>
+
+	* symfile.c (add_kext_command): Use printable_name not
+	arch_name for the warning.
+	
+2008-03-24  Jason Molenda  (jmolenda@apple.com)
+
+	Original patch by Gaius Mulley <gaius@glam.ac.uk>, edited down
+	to just the DW_TAG_set_type support by Jonas Maebe.
+
+	* dwarf2read.c (read_set_type): Record a DW_TAG_set_type die.
+	(process_die): Call it.
+	(new_symbol): Recognize the tag.
+	(read_type_die): Call it.
+
+2003-03-21  Jim Ingham  <jingham@apple.com>
+
+	* fork-child.c (fork_inferior): Switch to using posix_spawn/
+	execve for both the shell & non-shell case.  That way we can
+	ensure that even if the shell is Universal we'll run the same
+	fork of the shell as of the executable.
+	
+2008-03-18  Jim Ingham  <jingham@apple.com>
+
+	* breakpoint.c (watch_command_1): If the value for the watch
+	expression's type is TYPE_CODE_ERROR, discard the watchpoint.
+	
+2008-03-17  Jim Ingham  <jingham@apple.com>
+
+	* remote.c (remote_create_inferior): Use the QEnvironment packet
+	to send down the environment to the target.  Also, changed the remote
+	args code to share a buffer & cleanup with the environment code.
+	
+2008-03-12  Jason Molenda  (jmolenda@apple.com)
+
+	* objc-lang.c (find_implementation_from_class): Compare the cstring 
+	names of the classes instead of the class pointers themselves.
+	(new_objc_runtime_find_impl): Remove accidental duplicated code.
+
+2008-03-12  Caroline Tice  <ctice@apple.com>
+
+	* symfile.c (append_psymbols_as_msymbols):  Check the return value from
+	lookup_minimal_symbol_by_pc_section_from_objfile to make sure it's
+	really the same symbol before skipping over it.
+
+2008-03-10  Caroline Tice  <ctice@apple.com>
+
+	* block.c (inferior.h): New include file.
+	(blockvector_for_pc_sect):  Check to see if parameters are the same
+	as the last time this function was called; if so return 
+	cached values; otherwise find the
+	appropriate values, and re-set the cached parameters and return values.
+	(block_for_pc_sect): Likewise.
+	* blockframe.c (find_pc_sect_function): Likewise.
+	* corefile.c (reopen_exec_file): Add call to 
+	symtab_clear_cached_lookup_values.
+	* objfiles.c (find_pc_sect_section): Check to see if parameters are the
+	same as the last time this function was calle; if so return cached
+	value; otherwise find the appropriate value, and re-set the cached
+	parameters and return value.
+	* symfile.s (replace_psymbols with correct_psymbols):  Add call to
+	symtab_clear_cached_lookup_values.
+	(symbol_file_clear): Likewise.
+	(reread_symbols): Likewise.
+	(remove_symbol_file_command): Likewise.
+	(find_pc_overlay): Check to see if parameters are the
+	same as the last time this function was calle; if so return cached
+	value; otherwise find the appropriate value, and re-set the cached
+	parameters and return value.
+	(find_pc_mapped_section):  Likewise.
+	* symtab.c (cached_mapped_section, cached_overlay_section,
+	cached_sect_section, cached_symtab, cached_psymtab, cached_pc_line,
+	cached_pc_function, cached_blockvector, cached_blockvector_index,
+	cached_block, last_block_lookup_pc, last_blockvector_lookup_pc,
+	last_function_lookup_pc, last_pc_line_lookup_pc, 
+	last_psymtab_lookup_pc, last_symtab_lookup_pc, 
+	last_sect_section_lookup_pc, last_mapped_section_lookup_pc, 
+	last_overlay_section_lookup_pc):  New global variables.
+	(find_pc_sect_psymtab): Check to see if parameters are the
+	same as the last time this function was calle; if so return cached
+	value; otherwise find the appropriate value, and re-set the cached
+	parameters and return value.
+	(find_pc_sect_symtab): Likewise.
+	(find_pc_sect_line): Likewise.
+	(copy_sal):  New function.
+	(symtab_clear_cached_lookup_values): New function.
+	* symtab.h (cached_mapped_section, cached_overlay_section,
+	cached_sect_section, cached_symtab, cached_psymtab, cached_pc_line,
+	cached_pc_function, cached_blockvector, cached_blockvector_index,
+	cached_block, last_block_lookup_pc, last_blockvector_lookup_pc,
+	last_function_lookup_pc, last_pc_line_lookup_pc, 
+	last_psymtab_lookup_pc, last_symtab_lookup_pc, 
+	last_sect_section_lookup_pc, last_mapped_section_lookup_pc, 
+	last_overlay_section_lookup_pc):  New extern global variable 
+	declarations.
+	(symtab_clear_cached_lookup_values): New extern function declaration.
+
+2008-03-06  Jim Ingham  <jingham@apple.com>
+
+	*infrun.c (handle_inferior_event): Catch possible errors
+	unwinding to the caller frame.
+	
+	* printcmd.c (address_info): Don't crash if there's no
+	currently selected block.
+	
+2008-03-05  Jason Molenda  (jmolenda@apple.com)
+
+	Patch from George Helffrich.
+	* dwarf2read.c (read_common_block): Record the current die's linkage name
+	while children die processing.
+	(decode_locdesc): If parent die's linkage name was set, use it.
+
+2008-03-05  Jason Molenda  (jmolenda@apple.com)
+
+	* remote.c (PROTOCOL_LOG_COUNT): Double to 400 packets.
+	(add_pkt_to_protocol_log): Record empty replies from the remote stub.
+
+2008-03-05  Jason Molenda  (jmolenda@apple.com)
+
+	* configure.ac: Look for DebugSymbols framework in $SDKROOT.
+	* configure: Regenerated.
+
+2008-03-04  Greg Clayton  <gclayton@apple.com>
+
+	* thread.c (info_threads_command): Use ui_out functions
+	when outputting text so things stay in sync when using MI.
+
 2008-02-26  Jim Ingham  <jingham@apple.com>
 
 	* ui-out.c (ui_out_print_annotation_int): Remove errant
@@ -41,13 +190,6 @@
 	* arm-tdep.h (enum gdb_regnum): Clarify what the different register
 	names indicate.
 
-2008-02-20  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (send_remote_max_packet_size): Rename to
-	send_remote_max_payload_size.  Send the QSetMaxPayloadSize
-	packet instead of the QSetMaxPacketSize to avoid any ambiguity
-	in its meaning.
-
 2008-02-20  Jim Ingham  <jingham@apple.com>
 
 	* objc-lang.c (new_objc_runtime_get_classname): Don't goto out
@@ -78,12 +220,6 @@
 	* config/arm/tm-arm-macosx.h: Declare arm_throw_catch_find_typeinfo
 	and the THROW_CATCH_FIND_TYPEINFO macro.
 	
-2008-02-18  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (send_remote_max_packet_size): Tell the remote stub the
-	maximum packet size gdb is prepared to handle.
-	(remote_start_remote): Call it.
-
 2008-02-15  Jim Ingham  <jingham@apple.com>
 
 	* breakpoint.c (breakpoint_re_set_one): Don't raise the load level
@@ -122,26 +258,11 @@
 	* symfile.c (append_psymbols_as_msymbols): Don't add a minsym if
 	it already exists in the original objfile.
 	
-2008-02-12  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (init_all_packet_configs): Re-enable the
-	software-breakpoint packet (Z0/z0) by default again.
-
-2008-02-12  Jim Ingham  <jingham@apple.com>
-
-	* remote.c (remote_create_inferior): Make sure the
-	sprintf doesn't overflow the buffer.
-	
 2008-02-09  Jim Ingham  <jingham@apple.com>
 
 	* objc-lang.c (new_objc_runtime_find_impl): Check for
 	and call the new gdb_class_getClass.
 	
-2008-02-09  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (init_all_packet_configs): Disable the
-	software-breakpoint packet (Z0/z0) by default for now.
-
 2008-02-08  Jim Ingham  <jingham@apple.com>
 
 	* objc-lang.c (new_objc_runtime_find_impl): Set unwind_on_signal
@@ -149,23 +270,10 @@
 	(find_implementation_from_class): Do more work to validate
 	the input class before looking for the method.
 
-2008-02-08  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (dump_protocol_log): Quote nonprintable characters,
-	omit the mi command sequence seperator char if there is no
-	mi command sequence number.
-
 2008-02-06  Jim Ingham  <jingham@apple.com>
 
 	* valops.c (check_safe_call): Set stack_depth in the args.
 	
-2008-02-05  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (send_remote_debug_filename): Removed.
-	(set_remote_debug_filename_command): Same.
-	(show_remote_debug_filename_command): Same.
-	(_initialize_remote): Remove set remote logging-filename command.
-
 2008-02-05  Jim Ingham  <jingham@apple.com>
 
 	* objfiles.h: Add OBJF_SYM_DONT_CHANGE and the masks
@@ -182,54 +290,6 @@
 	* target.h: Declare set_trust_readonly.
 	* mem-break.c: Remove extern of set_trust_readonly.
 	
-2008-02-01  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (add_packet_config_cmd): Shorten set/show description to
-	fit within 80 chars better.
-	(send_remote_debug_filename): New function to send a logging filename
-	to debugserver to save its logging messages.
-	(set_remote_debug_filename_command): Verify that the user-specified
-	filename doesn't contain characters that cause the remote protocol
-	to have problems; send it to the remote stub.
-	(show_remote_debug_filename_command): Show the current setting.
-	(remote_start_remote): Send the logging filename to the remote stub
-	if it was specified pre-connection.
-	(_initialize_remote): Add the 'set remote logging-filename' command.
-
-2008-01-30  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (remote_backtrace_self): Print a backtrace of gdb so we
-	can understand what gdb was doing when it hit an error where printing
-	contextual information is hard.
-	(initalize_protocol_log, add_incoming_pkt_to_protocol_log,
-	add_outgoing_pkt_to_protocol_log, dump_protocol_log, 
-	dump_packets_command): Maintain a ring buffer of all remote protocol
-	packets so they can be displayed by hand or when an unrecoverable error
-	occurs.
-	(fromhex): On error, show gdb backtrace and remote packet logs.
-	(remote_stop, putpkt_binary, getpkt_sane, remote_start_remote): Add 
-	packets to packet log ring buffer.
-	(putpkt_binary): Remove extraneous 'break' which would prevent
-	acks from being sent to remote stub.
-	(_initialize_remote): Register "maintenance dump-packets" command.
-	* remote.h (struct remote_stats): Add mi_token field to record the
-	current mi token, if there is one.
-
-2008-01-29  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (send_remote_debugflags_pkt): New function to send
-	debug flags to the remote stub via the QSetLogging packet.
-	(set_remote_debugflags_command): Check that the debug flags look
-	reasonable; send it to the remote stub if connected.
-	(_initialize_remote): Add the set/show debug remoteflags cmds.
-	Fixed lots of minor signed vs unsigned warnings to make the file
-	mostly warning free.
-
-2008-01-26  Jim Ingham  <jingham@apple.com>
-
-	* remote.c (remote_start_remote): Set target_has_registers
-	to 0 if we don't have a process yet.  
-	
 2008-01-24  Jim Ingham  <jingham@apple.com>
 
 	* memattr.h: MEM_NONE - new def'n.
@@ -238,30 +298,6 @@
 	(_initialize_mem): Fix doc string to add "none" mode.
 	* target.c (memory_xfer_partial): Return an error if we are
 	in a MEM_NONE memory region.
-	
-2008-01-23  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (set_max_remote_packet_size): Don't show the newly
-	set max packet size; set commands shouldn't print anything
-	unless there's an error.
-
-2008-01-23  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c: Add no-ack mode to the remote protocol -- optionally
-        stop ACKing packets and responses when we have a reliable
-	communication medium.
-	(no_ack_mode): New global.
-	(start_no_ack_mode): Ask the remote stub to start no-ack mode.
-	(set_no_ack_mode_cmd, show_no_ack_mode_cmd): User interface.
-	(remote_start_remote): Try starting no-ack mode if requested.
-	(putpkt_binary): Change ifdef NO_ACKS to use global var instead.
-	(getpkt_sane): Same.
-	(_initialize_remote): Add set remote noack-mode set/show.
-	* dcache.c (LINE_SIZE_POWER): Default to 6 for 64-byte bufferings.
-
-2008-01-23  Jim Ingham  <jingham@apple.com>
-
-	* remote.c (remote_create_inferior): Missing "*" operator.
 	
 2008-01-23  Greg Clayton  <gclayton@apple.com>
 
@@ -292,68 +328,6 @@
 	prototype for fast stack support.
 	(FAST_COUNT_STACK_DEPTH): New macro for fast stack support.
 
-2008-01-18  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (putpkt_binary): Account for packets in noack mode.
-
-2008-01-18  Jim Ingham  <jingham@apple.com>
-
-        Import Daniel's fix for PR remote/1966 (trust-readonly-sections
-        doesn't work.)
-        2006-08-15  Daniel Jacobowitz  <dan@codesourcery.com>
-
-            PR remote/1966
-                * dcache.c (dcache_write_line): Use target_write.
-                (dcache_read_line): Use target_read.
-                * mi/mi-main.c (mi_cmd_data_read_memory): Use target_read.
-                * symfile.c (struct load_section_data): Add new per-section
-                members.
-                (load_progress): New function.
-                (load_section_callback): Pass load_progress to the new
-                target_write_with_progress.
-                * target.c (current_xfer_partial, memory_xfer_partial): New.
-                (target_xfer_partial): New prototype.
-                (target_xfer_memory, target_xfer_partial_p, xfer_using_stratum)
-                (do_xfer_memory, target_xfer_memory_partial)
-                (target_read_memory_partial, target_write_memory_partial): Delete.
-                (trust_readonly): Move higher in the file.
-                (update_current_target): Use current_xer_partial.
-                (target_xfer_partial): Use memory_xfer_partial.  Handle
-                TARGET_OBJECT_RAW_MEMORY specially.
-                (target_read_memory): Use target_read.
-                (target_write_memory): Use target_write.
-                (default_xfer_partial): Call to_xfer_partial directly.
-                (target_write_with_progress): New function, based on target_write.
-                (target_write): Call it.
-                * target.h (enum target_object): Add TARGET_OBJECT_RAW_MEMORY.
-                (target_write_with_progress): New prototype.
-                (do_xfer_memory, target_read_memory_partial)
-                (target_write_memory_partial): Delete prototypes.
-
-        2006-08-15  Daniel Jacobowitz  <dan@codesourcery.com>
-
-                * remote.c (remote_write_bytes): Take a const buffer argument.
-                Do the checks from remote_xfer_memory.
-                (remote_read_bytes): Do the checks from remote_xfer_memory.
-                (remote_xfer_memory): Remove checks pushed into lower level
-                functions.
-                (remote_xfer_partial): Call remote_write_bytes and remote_read_bytes
-                directly.
-                * remote.h (remote_write_bytes): Update prototype.
-        Also:
-        * mem-break.c (default_{insert,remove}_memory_breakpoint): Override
-        trust-readonly-sections for these calls.
-        * target.c (memory_xfer_partial): Use find_pc_in_ordered_sections to get the
-        bfd_section containing the pc.  It is much faster than the unordered search
-        through the target.to_sections.
-
-2008-01-17  Jason Molenda  (jmolenda@apple.com)
-
-	* remote.c (putpkt_binary): Don't send ack/nack packets if 
-	NO_ACKS is defined.
-	(getpkt_sane): Same.
-	(read_frame): Same.  Don't verify the checksum value.
-
 2008-01-16  Jim Ingham  <jingham@apple.com>
 
         * fork-child.c: Move breakup_args from here to:
@@ -373,24 +347,6 @@
         (remote_xfer_partial): If the remote side doesn't have a target
         yet, don't try to read its memory.
         (_initialize_remote): Add remote executable-directory set command.
-
-2008-01-14  Jason Molenda  (jmolenda@apple.com)
-
-        * remote.c (total_packets_sent, total_packets_received): Track the
-        total number of packets sent/received.
-        (putpkt_binary, getpkt_sane): Update them.
-        * remote.h: externs.
-
-2008-01-11  Jason Molenda  (jmolenda@apple.com)
-
-        * remote.c (start_remote_timer, end_remote_timer): Functions to track
-        how much time is spent waiting for the remote target to reply to pkts.
-        (remote_start_remote): Track bytes sent/received.
-        (remote_stop): Ditto.
-        (readchar): Ditto.
-        (putpkt_binary): Ditto.
-        (getpkt_sane): Ditto.
-        * remote.h: Definition of struct remote_stats.
 
 2008-01-10  Jason Molenda  (jmolenda@apple.com)
 
@@ -419,11 +375,6 @@
 	(show_remote_cmd): Added a call to show_max_remote_packet_size ()
 	(_initialize_remote): Added a new "set/show remote max-packet-size"
 	command.	
-
-2007-11-28  Caroline Tice  <ctice@apple.com>
-
-	* dwarf2read.c (dwarf_decode_lines):  Don't add in baseaddr until
-	after calls to translate_debug_map_address.
 
 2007-11-27  Greg Clayton  <gclayton@apple.com>
 
@@ -642,6 +593,459 @@
 	* symfile.c (open_bfd_matching_arch): For ARM, if we support ARMV6, 
 	use and ARMV6 slices that are available, else fall back to ARMV4.
 	* config/powerpc/macosx.mt: Re-format whitespace.
+
+2007-11-08  Greg Clayton  <gclayton@apple.com>
+
+	* dwarf2read.h (struct oso_final_addr_tuple): Changed 
+	PST_FILENAME to a partial_symtab struct pointer named PST.
+	* dwarf2read.c (compare_map_entries_final_addr_index): Added 
+	secondary sort based on oso_low_addr for final addrs that aren't
+	in the final image.
+	(convert_oso_map_to_final_map): Initialize final_addr in all 
+	tuples,	and store partial_symtab with translation map.
+	(create_kext_addr_map): Ditto.
+	(translate_debug_map_address): Make sure next FINAL_ADDR 
+	is valid when we use it, and make sure *ADDR doesn't exceed
+	the high text address of the corrseponding partial_symtab.
+	(translate_common_symbol_debug_map_address): Access partial
+	symtab filename using new PST member.
+	(dwarf_decode_lines): Don't translate line table addresses 
+	until they are about to be added so we can properly 
+	determine if we are translating addresses as HIGHPC addresses.
+
+2008-02-26  Caroline Tice  <ctice@apple.com>
+
+        * breakpoint.c (breakpoint_re_set_one): Add two local variables, found
+	and j; if more than one sal is returned for the breakpoint, loop 
+	through them trying to figure out which one is correct for the pc in 
+	the current breakpoint.  Use the last sal if we can't figure it out 
+	(fall back on original behavior).
+
+2008-02-26  Caroline Tice  <ctice@apple.com>
+
+        * dwarf2read.c (read_inlined_subroutine_scope):  Make sure the
+	caller and callee functions both have names before calling
+	dwarf2_add_to_list_of_inlined_calls.
+	* inlining.c (complaints.h): New include statement.
+	(inlined_function_add_function_names):  If caller or callee have
+	NULL function names, complain and assign "unknown function" to 
+	them.
+
+2008-02-20  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (send_remote_max_packet_size): Rename to
+        send_remote_max_payload_size.  Send the QSetMaxPayloadSize
+        packet instead of the QSetMaxPacketSize to avoid any ambiguity 
+        in its meaning.
+
+2008-02-18  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (send_remote_max_packet_size): Tell the remote stub the
+        maximum packet size gdb is prepared to handle.
+        (remote_start_remote): Call it.
+
+2008-02-12  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (init_all_packet_configs): Re-enable the
+        software-breakpoint packet (Z0/z0) by default again.
+
+2008-02-12  Jim Ingham  <jingham@apple.com>
+
+        * remote.c (remote_create_inferior): Make sure the
+        sprintf doesn't overflow the buffer.
+
+2008-02-09  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (init_all_packet_configs): Disable the
+        software-breakpoint packet (Z0/z0) by default for now.
+
+2008-02-08  Jim Ingham  <jingham@apple.com>
+
+	* objc-lang.c (new_objc_runtime_find_impl): Set unwind_on_signal
+	off while calling the function in the runtime.
+	(find_implementation_from_class): Do more work to validate
+	the input class before looking for the method.
+	
+2008-02-08  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (dump_protocol_log): Quote nonprintable characters,
+        omit the mi command sequence seperator char if there is no
+        mi command sequence number.
+
+2008-02-06  Jim Ingham  <jingham@apple.com>
+
+	* valops.c (check_safe_call): Set stack_depth in the args.
+	
+2008-02-05  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (send_remote_debug_filename): Removed.
+        (set_remote_debug_filename_command): Same.
+        (show_remote_debug_filename_command): Same.
+        (_initialize_remote): Remove set remote logging-filename command.
+
+2008-02-01  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (add_packet_config_cmd): Shorten set/show description to
+        fit within 80 chars better.
+        (send_remote_debug_filename): New function to send a logging filename
+        to debugserver to save its logging messages.
+        (set_remote_debug_filename_command): Verify that the user-specified
+        filename doesn't contain characters that cause the remote protocol
+        to have problems; send it to the remote stub.   
+        (show_remote_debug_filename_command): Show the current setting. 
+        (remote_start_remote): Send the logging filename to the remote stub
+        if it was specified pre-connection.
+        (_initialize_remote): Add the 'set remote logging-filename' command.
+
+2008-01-30  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (remote_backtrace_self): Print a backtrace of gdb so we
+        can understand what gdb was doing when it hit an error where printing
+        contextual information is hard.
+        (initalize_protocol_log, add_incoming_pkt_to_protocol_log,
+        add_outgoing_pkt_to_protocol_log, dump_protocol_log,
+        dump_packets_command): Maintain a ring buffer of all remote protocol
+        packets so they can be displayed by hand or when an unrecoverable error
+        occurs.
+        (fromhex): On error, show gdb backtrace and remote packet logs.
+        (remote_stop, putpkt_binary, getpkt_sane, remote_start_remote): Add
+        packets to packet log ring buffer.
+        (putpkt_binary): Remove extraneous 'break' which would prevent
+        acks from being sent to remote stub.
+        (_initialize_remote): Register "maintenance dump-packets" command.
+        * remote.h (struct remote_stats): Add mi_token field to record the
+        current mi token, if there is one.
+
+2008-01-29  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (send_remote_debugflags_pkt): New function to send
+        debug flags to the remote stub via the QSetLogging packet.
+        (set_remote_debugflags_command): Check that the debug flags look
+        reasonable; send it to the remote stub if connected.
+        (_initialize_remote): Add the set/show debug remoteflags cmds.
+        Fixed lots of minor signed vs unsigned warnings to make the file
+        mostly warning free.
+
+2008-01-25  Caroline Tice  <ctice@apple.com>
+
+	* varobj.c (varobj_update): Don't set varp->root->in_scope to 0
+	if the type comes back unchanged; use new retval, -4, to indicate
+	when a varobj has come back into scope.
+	(value_of_root): If tmp_var indicates the varobj has come back
+	into scope (from being out of scope), set type_changed to be
+	VAROBJ_SCOPE_CHANGED.
+	* varobj.h (enum varobj_type_change):  Add new enum value, 
+	VAROBJ_SCOPE_CHANGED.
+
+2008-01-24  Jim Ingham  <jingham@apple.com>
+
+	* memattr.h: MEM_NONE - new def'n.
+	* memattr.c (mem_command): Translate "none" to "MEM_NONE".
+	(mem_info): Print MEM_NONE as "none".
+	(_initialize_mem): Fix doc string to add "none" mode.
+	* target.c (memory_xfer_partial): Return an error if we are
+	in a MEM_NONE memory region.
+
+2008-01-23  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (set_max_remote_packet_size): Don't show the newly
+        set max packet size; set commands shouldn't print anything
+        unless there's an error.
+
+2008-01-23  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c: Add no-ack mode to the remote protocol -- optionally
+        stop ACKing packets and responses when we have a reliable  
+        communication medium.
+        (no_ack_mode): New global.
+        (start_no_ack_mode): Ask the remote stub to start no-ack mode.
+        (set_no_ack_mode_cmd, show_no_ack_mode_cmd): User interface.
+        (remote_start_remote): Try starting no-ack mode if requested.
+        (putpkt_binary): Change ifdef NO_ACKS to use global var instead.
+        (getpkt_sane): Same.
+        (_initialize_remote): Add set remote noack-mode set/show.
+        * dcache.c (LINE_SIZE_POWER): Default to 6 for 64-byte bufferings.
+
+2008-01-23  Jim Ingham  <jingham@apple.com>
+
+	* remote.c (remote_create_inferior): Missing "*" operator.
+	
+2008-01-18  Greg Clayton  <gclayton@apple.com>
+
+        * remote.c (DEFAULT_MAX_REMOTE_PACKET_SIZE): Default to max remote
+        packet size to 2000.
+        (set_max_remote_packet_size): Allow max remote packet size to be
+        reduced below the initial max value.
+
+2008-01-18  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (putpkt_binary): Account for packets in noack mode.
+
+2008-01-18  Jim Ingham  <jingham@apple.com>
+
+	Import Daniel's fix for PR remote/1966 (trust-readonly-sections
+	doesn't work.)
+        2006-08-15  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	    PR remote/1966
+	        * dcache.c (dcache_write_line): Use target_write.
+	        (dcache_read_line): Use target_read.
+	        * mi/mi-main.c (mi_cmd_data_read_memory): Use target_read.
+	        * symfile.c (struct load_section_data): Add new per-section
+	        members.
+	        (load_progress): New function.
+	        (load_section_callback): Pass load_progress to the new
+	        target_write_with_progress.
+	        * target.c (current_xfer_partial, memory_xfer_partial): New.
+	        (target_xfer_partial): New prototype.
+	        (target_xfer_memory, target_xfer_partial_p, xfer_using_stratum)
+	        (do_xfer_memory, target_xfer_memory_partial)
+	        (target_read_memory_partial, target_write_memory_partial): Delete.
+	        (trust_readonly): Move higher in the file.
+	        (update_current_target): Use current_xer_partial.
+	        (target_xfer_partial): Use memory_xfer_partial.  Handle
+	        TARGET_OBJECT_RAW_MEMORY specially.
+	        (target_read_memory): Use target_read.
+	        (target_write_memory): Use target_write.
+	        (default_xfer_partial): Call to_xfer_partial directly.
+	        (target_write_with_progress): New function, based on target_write.
+	        (target_write): Call it.
+	        * target.h (enum target_object): Add TARGET_OBJECT_RAW_MEMORY.
+	        (target_write_with_progress): New prototype.
+	        (do_xfer_memory, target_read_memory_partial)
+	        (target_write_memory_partial): Delete prototypes.
+
+	2006-08-15  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	        * remote.c (remote_write_bytes): Take a const buffer argument.
+	        Do the checks from remote_xfer_memory.
+	        (remote_read_bytes): Do the checks from remote_xfer_memory.
+	        (remote_xfer_memory): Remove checks pushed into lower level
+	        functions.
+	        (remote_xfer_partial): Call remote_write_bytes and remote_read_bytes
+	        directly.
+	        * remote.h (remote_write_bytes): Update prototype.
+	Also:
+	* mem-break.c (default_{insert,remove}_memory_breakpoint): Override
+	trust-readonly-sections for these calls.
+	* target.c (memory_xfer_partial): Use find_pc_in_ordered_sections to get the
+	bfd_section containing the pc.  It is much faster than the unordered search
+	through the target.to_sections.
+	
+2008-01-17  Jason Molenda  (jmolenda@apple.com)
+
+        * remote.c (putpkt_binary): Don't send ack/nack packets if 
+        NO_ACKS is defined.
+        (getpkt_sane): Same.
+        (read_frame): Same.  Don't verify the checksum value.
+
+2008-01-17  Jason Molenda  (jmolenda@apple.com)
+
+	* remote.c (remote_create_inferior): Fix printf specs for
+	printing hex chars.
+
+2008-01-16  Greg Clayton  <gclayton@apple.com>
+
+        * cli/cli-dump.c (g_max_binary_file_chunk): New global variable.
+        (restore_binary_file): Segment binary downloads into chunks of
+        size G_MAX_BINARY_FILE_CHUNK.
+        (set_binary_buffer_size): New function.
+        (show_binary_buffer_size): New function.
+        (set_restore_cmd): New function.
+        (show_restore_cmd): New function.
+        (_initialize_cli_dump): Add "restore" as a new prefix for 
+        set and show lists that call set_restore_cmd () and 
+        show_restore_cmd (). Added "binary-buffer-size" as a child
+        of the new "set/show restore" command.
+        * remote.c (MIN_MAX_REMOTE_PACKET_SIZE): New define.
+        (g_max_remote_packet_size): New global variable.
+        (init_remote_state): Init remote_packet_size with current value
+        of new G_MAX_REMOTE_PACKET_SIZE variable.
+        (set_max_remote_packet_size): New function.
+        (show_max_remote_packet_size): New function.
+        (show_remote_cmd): Added a call to show_max_remote_packet_size ()
+        (_initialize_remote): Added a new "set/show remote max-packet-size"
+        command.        
+
+2008-01-16  Jason Molenda  (jmolenda@apple.com)
+
+	* objfiles.c (sanity_check_symtab_obsoleted_flag, 
+	sanity_check_psymtab_obsoleted_flag): Remove.
+	(symtab_get_first, symtab_get_next): Don't call them.
+	(psymtab_get_first, psymtab_get_next): Don't call them.
+	* objfiles.h (ALL_PSYMTABS_INCL_OBSOLETED): Remove.
+
+2008-01-16  Jim Ingham  <jingham@apple.com>
+
+	* fork-child.c: Move breakup_args from here to:
+	* utils.c: here.
+	* defs.h: declare breakup_args.
+	* remote.c: Remove extern declaration for breakup_args.
+	
+2008-01-14  Jim Ingham  <jingham@apple.com>
+
+	* fork-child.c (breakup_args): Make non-static.  Also return number
+	of args.
+	* remote.c (remote_start_remote): Handle case where the remote doesn't
+	have a target when we connect.
+	(remote_open_1) Ditto.
+	(remote_create_inferior): New function.
+	(remote_attach): New function.
+	(remote_xfer_partial): If the remote side doesn't have a target
+	yet, don't try to read its memory.
+	(_initialize_remote): Add remote executable-directory set command.
+	
+2008-01-14  Jason Molenda  (jmolenda@apple.com)
+
+	* remote.c (total_packets_sent, total_packets_received): Track the
+	total number of packets sent/received.
+	(putpkt_binary, getpkt_sane): Update them.
+	* remote.h: externs.
+
+2008-01-11  Jason Molenda  (jmolenda@apple.com)
+
+	* remote.c (start_remote_timer, end_remote_timer): Functions to track
+	how much time is spent waiting for the remote target to reply to pkts.
+        (remote_start_remote): Track bytes sent/received.
+	(remote_stop): Ditto.
+	(readchar): Ditto.
+	(putpkt_binary): Ditto.
+	(getpkt_sane): Ditto.
+	* remote.h: Definition of struct remote_stats.
+
+2008-01-09  Jason Molenda  (jmolenda@apple.com)
+
+	* objfiles.c (find_objfile_by_name): Take a flag to indicate whether
+	this is an exact-filename match or just matching the end of the 
+	filename.
+	(make_cleanup_restrict_to_objfile_by_name): Call updated.
+	* objfiles.h: Add prototype for find_objfile_by_name.
+	* fix-and-continue.c (find_objfile_by_name): Remove in favor of the
+	objfiles.c one.
+	(fix_command_1): If the shlib filename looks doesn't look like an
+	absolute file path, try doing a partial name match against the objfiles
+	we have loaded.
+	(fix_command_1, mark_previous_fixes_obsolete, get_fixed_file,
+	do_final_fix_fixups, find_new_static_symbols, find_orig_static_symbols,
+	find_and_parse_nonlazy_ptr_sect, build_list_of_objfiles_to_update,
+	find_original_object_file, raise_objfile_load_level): Update call
+	to find_objfile_by_name.
+
+2008-01-08  Jim Ingham  <jingham@apple.com>
+
+	* valops.c (value_cast_1): Handle the case where you are casting
+	up or down the class hierarchy with a reference type.
+	
+2007-12-14  Jim Ingham  <jingham@apple.com>
+
+	* serial.c (serial_open): Recognize the filedesc serial
+	type.
+	* config/powerpc/macosx.mt: Add remote-mobile.o.
+	* config/i386/macosx.mt: Add remote-mobile.o.
+	
+2007-12-12  Caroline Tice  <ctice@apple.com>
+
+	* dwarf2expr.c (exceptions.h): New include statement.
+	(execute_stack_op):  Throw an error if the variable is
+	uninitialized in the current location.
+	* dwarf2loc.c (locexpr_describe_location): Add some local
+	variables and initialize them, to enable a call to
+	print_single_dwarf_location, to print location better; remove
+	message that variable is too complex or has multiple locations.
+	(print_single_dwarf_location): Annotate location with "[uninitialized]"
+	if var is uninitialized in that location.
+
+2007-12-10  Caroline Tice  <ctice@apple.com>
+
+	* fork-child.c (startup_inferior): Don't attempt to resume the inferior
+	if it has exited, say with an error.
+
+2007-12-05  Jim Ingham  <jingham@apple.com>
+
+	* config/{i386,powerpc}/macosx.mh: Remove -Wno-long-double from CFLAGS,
+	it is no longer supported by gcc-4.2.
+
+2007-12-05  Caroline Tice  <ctice@apple.com>
+
+	* dwarf2read.c (struct inlined_call_record): Remove definition; move
+	it to inlining.h and rename it dwarf_inlined_call_record; remove
+	'next' field.
+	(inlined_call_sites): Remove global variable.
+	(dwarf2_add_to_list_of_inlined_calls):  Add objfile parameter; change
+	inlined_call_record to dwarf_inlined_call_record; remove inltialization
+	of 'next' field; insert new record into objfile list rather than global
+	var.
+	(read_inlined_subroutine_scope): Pass objfile to 
+	dwarf2_add_to_list_of_inlined_calls.
+	(check_cu_functions): Change inlined_call_record to
+	dwarf_inlined_call_record; search for call site info only in current 
+	objfile.
+	* inlining.c (inlined_subroutine_free_objfile_call_sites): New 
+	function.
+	* inlining.h (struct dwarf_inlined_call_record): New definition,
+	moved and renamed from dwarf2read.c.
+	(inlined_subroutine_free_objfile_call_sites): New extern declaration.
+	* objfiles.c (free_objfile_internal): Call 
+	inlined_subroutine_free_objfile_call_sites, if appropriate.
+	* objfiles.h (struct objfile): Add new field, inlined_call_sites.
+
+2007-12-04  Greg Clayton  <gclayton@apple.com>
+
+	* dwarf2read.c (translate_debug_map_address_with_tuple): New 
+	function.
+	(compare_translation_tuples_inclusive): New function.
+	(translate_debug_map_address): Call new function
+	translate_debug_map_address_with_tuple.
+	(dwarf2_record_line): New function that correctly links DWARF 
+	line tables when using debug maps.
+	(dwarf_decode_lines): Call new dwarf2_record_line function to 
+	recording line table entries.
+
+2007-11-30  Caroline Tice  <ctice@apple.com>
+
+	* parse.c (parse_exp_in_context):  Initialize innermost_block
+	before call to parser.
+
+2007-11-29  Jim Ingham  <jingham@apple.com>
+
+	* varobj.c (free_variable): Free the varobj's value.
+
+	* i386-tdep.c (i386_frame_cache): Raise the load level of the
+	frame's pc before finding the current frame's function start.
+	
+2007-11-28  Caroline Tice  <ctice@apple.com>
+
+	* dwarf2read.c (dwarf_decode_lines):  Don't add in baseaddr until
+	after calls to translate_debug_map_address.
+
+2007-11-15  Jason Molenda  (jmolenda@apple.com)
+
+	* linespec.c (symbols_found): Add a sanity check to get an error
+	instead of a crash with a F&C symbol problem.
+
+2007-11-15  Jason Molenda  (jmolenda@apple.com)
+
+	* i386-tdep.c (i386_analyze_frame_setup): Reduce instruction
+	limit to 50 insns.  Enforce it for the register saves as well
+	as the initial frame pointer setup.
+	(i386_analyze_prologue): Omit calls to prologue-checker functions
+	that never match anything on our platform.
+
+2007-11-15  Caroline Tice  <ctice@apple.com>
+
+        * infrun.c (step_info_function):  Check to see if inside
+	a trampoline before updating ecs->stop_func_start.
+
+2007-11-15  Jason Molenda  (jmolenda@apple.com)
+
+	* dwarf2read.c (translate_debug_map_address): Add comment about
+	this issue.
+
+2007-11-15  Caroline Tice  <ctice@apple.com>
+
+        * dwarf2read.c (translate_debug_map_address) Comment out the
+	code that caps the translation with pst->texthigh; it's not 
+	quite right, and it causes lots of regression tests to fail.
 
 2007-11-08  Greg Clayton  <gclayton@apple.com>
 

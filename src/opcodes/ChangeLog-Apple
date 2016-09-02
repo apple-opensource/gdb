@@ -1,6 +1,6 @@
 2007-11-06  Greg Clayton  <gclayton@apple.com>
 
-	* arm-dis.c (print_insn_thumb32): Fixed BLX(1) offset for thumb.
+        * arm-dis.c (print_insn_thumb32): Fixed BLX(1) offset for thumb.
 
 2007-05-09  Jason Molenda  (jmolenda@apple.com)
 

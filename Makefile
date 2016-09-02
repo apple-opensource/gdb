@@ -1,5 +1,5 @@
 GDB_VERSION = 6.3.50-20050815
-GDB_RC_VERSION = 870
+GDB_RC_VERSION = 952
 
 BINUTILS_VERSION = 2.13-20021117
 BINUTILS_RC_VERSION = 46
@@ -10,7 +10,7 @@ BINUTILS_RC_VERSION = 46
 	install-frameworks-macosx \
 	install-binutils-macosx \
 	install-gdb-fat \
-	install-chmod-macosx \
+	install-chmod-macosx install-chmod-macosx-noprocmod \
 	install-clean install-source check
 
 
@@ -47,8 +47,8 @@ CANONICAL_ARCHS := $(foreach arch,$(RC_ARCHS),$(foreach os,$(RC_OS),$(foreach re
 
 CANONICAL_ARCHS := $(subst macos:i386:$(RC_RELEASE),i386-apple-darwin,$(CANONICAL_ARCHS))
 CANONICAL_ARCHS := $(subst macos:ppc:$(RC_RELEASE),powerpc-apple-darwin,$(CANONICAL_ARCHS))
-CANONICAL_ARCHS := $(subst macos:arm:$(RC_RELEASE),arm-apple-darwin8,$(CANONICAL_ARCHS))
-CANONICAL_ARCHS := $(subst macos:armv6:$(RC_RELEASE),arm-apple-darwin8,$(CANONICAL_ARCHS))
+CANONICAL_ARCHS := $(subst macos:arm:$(RC_RELEASE),arm-apple-darwin,$(CANONICAL_ARCHS))
+CANONICAL_ARCHS := $(subst macos:armv6:$(RC_RELEASE),arm-apple-darwin,$(CANONICAL_ARCHS))
 
 CANONICAL_ARCHS := $(subst powerpc-apple-darwin i386-apple-darwin,i386-apple-darwin powerpc-apple-darwin,$(CANONICAL_ARCHS))
 
@@ -65,7 +65,7 @@ ifeq (ppc,$(ARCH_SAYS))
 BUILD_ARCH := powerpc-apple-darwin
 else
 ifeq (arm,$(ARCH_SAYS))
-BUILD_ARCH := arm-apple-darwin8
+BUILD_ARCH := arm-apple-darwin
 else
 BUILD_ARCH := $(ARCH_SAYS)
 endif
@@ -122,7 +122,7 @@ NM = nm
 CC_FOR_BUILD = gcc
 
 ifndef CDEBUGFLAGS
-CDEBUGFLAGS = -gdwarf-2
+CDEBUGFLAGS = -gdwarf-2 -Os
 endif
 
 CFLAGS = $(CDEBUGFLAGS) $(RC_CFLAGS)
@@ -161,7 +161,7 @@ CONFIG_ENABLE_BUILD_WARNINGS=--enable-build-warnings
 CONFIG_ENABLE_TUI=--disable-tui
 CONFIG_ALL_BFD_TARGETS=
 CONFIG_ALL_BFD_TARGETS=
-ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin8"
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
 	CONFIG_64_BIT_BFD=
 else
 	CONFIG_64_BIT_BFD=--enable-64-bit-bfd
@@ -179,7 +179,7 @@ ifndef CDEBUGFLAGS
 CDEBUGFLAGS = -gdwarf-2
 endif
 
-CFLAGS = $(strip $(RC_CFLAGS_NOARCH) $(CDEBUGFLAGS) -Wall -Wimplicit -Wno-long-double)
+CFLAGS = $(strip $(RC_CFLAGS_NOARCH) $(CDEBUGFLAGS) -Wall -Wimplicit)
 HOST_ARCHITECTURE = $(shell echo $* | sed -e 's/--.*//' -e 's/powerpc/ppc/' -e 's/-apple-macosx.*//' -e 's/-apple-macos.*//' -e 's/-apple-darwin.*//')
 endif
 
@@ -256,36 +256,38 @@ crossarm: CDEBUGFLAGS ?= -gdwarf-2 -D__DARWIN_UNIX03=0
 crossarm:;
         
 	echo BUILDING CROSSARM; \
-	$(RM)  $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8
+	$(RM)  $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin
 	for i in $(RC_ARCHS); do \
-		$(RM) -r $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8; \
-		$(INSTALL) -c -d $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8; \
-		(cd $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8/ && \
+		$(RM) -r $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin; \
+		$(INSTALL) -c -d $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin; \
+		(cd $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin/ && \
 			$(CONFIGURE_ENV) CC="cc -arch $${i}" $(MACOSX_FLAGS) $(SRCTOP)/src/configure \
 				--host=$${i}-apple-darwin \
-				--target=arm-apple-darwin8 \
+				--target=arm-apple-darwin \
                                 --build=$(BUILD_ARCH) \
 				CFLAGS=" -isystem $(SDKROOT)/usr/include $(CDEBUGFLAGS)" \
 				$(CONFIGURE_OPTIONS) \
 			); \
 		mkdir -p $(SYMROOT)/$(LIBEXEC_GDB_DIR); \
 		mkdir -p $(DSTROOT)/$(LIBEXEC_GDB_DIR); \
-		$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8 configure-gdb; \
-		$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8 \
+		$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin configure-gdb; \
+		$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin \
 				-W version.in VERSION='$(GDB_VERSION_STRING)' GDB_RC_VERSION='$(GDB_RC_VERSION)' all-gdb; \
-		if [ -e $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8 ] ; then \
-			lipo -create $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8 $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8; \
+		if [ -e $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin ] ; then \
+			lipo -create $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin; \
 		else \
-			lipo -create $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin8/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8; \
+			lipo -create $(OBJROOT)/$${i}-apple-darwin--arm-apple-darwin/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin; \
 		fi;\
 	done;
-	(cd $(SYMROOT)/$(LIBEXEC_GDB_DIR)/ ; dsymutil gdb-arm-apple-darwin8)
-	strip -S -o $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8 \
-		$(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin8;  
+	(cd $(SYMROOT)/$(LIBEXEC_GDB_DIR)/ ; dsymutil gdb-arm-apple-darwin)
+	strip -S -o $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin \
+		$(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin
+	chown root:wheel $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin
+	chmod 755 $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-arm-apple-darwin
 	mkdir -p ${DSTROOT}/usr/bin
 	sed -e 's/version=.*/version=$(GDB_VERSION)-$(GDB_RC_VERSION)/' \
-                < $(SRCROOT)/gdb.sh > ${DSTROOT}/usr/bin/gdb; \
-	chmod 755 ${DSTROOT}/usr/bin/gdb; \
+                < $(SRCROOT)/gdb.sh > ${DSTROOT}/usr/bin/gdb
+	chmod 755 ${DSTROOT}/usr/bin/gdb
 
 #
 # cross
@@ -305,33 +307,33 @@ cross: 	LIBEXEC_GDB_DIR=usr/libexec/gdb
 cross:;
 	echo BUILDING CROSS $(RC_CROSS_ARCHS) for HOST $(RC_ARCHS); \
         for cross_arch in $(RC_CROSS_ARCHS); do \
-		$(RM)  $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8; \
+		$(RM)  $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin; \
 		for host_arch in $(RC_ARCHS); do \
 			echo BUILDING CROSS $${cross_arch} for HOST $${host_arch}; \
-			$(RM) -r $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8; \
-			$(INSTALL) -c -d $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8; \
-			(cd $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8/ && \
+			$(RM) -r $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin; \
+			$(INSTALL) -c -d $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin; \
+			(cd $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin/ && \
 				$(CONFIGURE_ENV) CC="cc -arch $${host_arch}" $(MACOSX_FLAGS) $(SRCTOP)/src/configure \
 					--host=$${host_arch}-apple-darwin \
-					--target=$${cross_arch}-apple-darwin8 \
+					--target=$${cross_arch}-apple-darwin \
 					--build=$(BUILD_ARCH) \
 					CFLAGS=" -isystem $(SDKROOT)/usr/include $(CDEBUGFLAGS)" \
 					$(CONFIGURE_OPTIONS) \
 				); \
 			mkdir -p $(SYMROOT)/$(LIBEXEC_GDB_DIR); \
 			mkdir -p $(DSTROOT)/$(LIBEXEC_GDB_DIR); \
-			$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8 configure-gdb; \
-			$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8 \
+			$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin configure-gdb; \
+			$(SUBMAKE) $(MACOSX_FLAGS) -C $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin \
 				-W version.in VERSION='$(GDB_VERSION_STRING)' GDB_RC_VERSION='$(GDB_RC_VERSION)' all-gdb; \
-			if [ -e $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8 ] ; then \
-				lipo -create $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8 $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8; \
+			if [ -e $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin ] ; then \
+				lipo -create $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin; \
 			else \
-				lipo -create $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin8/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8; \
+				lipo -create $(OBJROOT)/$${host_arch}-apple-darwin--$${cross_arch}-apple-darwin/gdb/gdb -output $(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin; \
 			fi; \
 		done; \
-                (cd $(SYMROOT)/$(LIBEXEC_GDB_DIR)/ ; dsymutil gdb-$${cross_arch}-apple-darwin8); \
-		strip -S -o $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8 \
-			$(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin8; \
+                (cd $(SYMROOT)/$(LIBEXEC_GDB_DIR)/ ; dsymutil gdb-$${cross_arch}-apple-darwin); \
+		strip -S -o $(DSTROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin \
+			$(SYMROOT)/$(LIBEXEC_GDB_DIR)/gdb-$${cross_arch}-apple-darwin; \
 	done; \
 	mkdir -p ${DSTROOT}/usr/bin; \
 	sed -e 's/version=.*/version=$(GDB_VERSION)-$(GDB_RC_VERSION)/' \
@@ -392,7 +394,7 @@ $(OBJROOT)/%/stamp-build-binutils:
 $(OBJROOT)/%/stamp-build-gdb:
 	$(SUBMAKE) -C $(OBJROOT)/$* configure-gdb
 	$(SUBMAKE) -C $(OBJROOT)/$*/gdb -W version.in $(MFLAGS) $(FSFLAGS) VERSION='$(GDB_VERSION_STRING)' GDB_RC_VERSION='$(GDB_RC_VERSION)' gdb
-ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin8"
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
 	$(SUBMAKE) -C $(OBJROOT)/$* configure-gdbserver
 	$(SUBMAKE) -C $(OBJROOT)/$*/gdb/gdbserver $(MFLAGS) $(FSFLAGS) VERSION='$(GDB_VERSION_STRING)' gdbserver
 endif
@@ -586,10 +588,6 @@ install-binutils-macosx:
 		strip -S -o $(DSTROOT)/$(LIBEXEC_BINUTILS_DIR)/$${instname} $(SYMROOT)/$(LIBEXEC_BINUTILS_DIR)/$${instname}; \
 	done
 
-# "procmod" is a new group (2005-09-27) which will not be present on all
-# the systems, so we use a '-' prefix on that loop for now so the errors
-# don't halt the build. 
-
 install-chmod-macosx:
 	set -e; for dstroot in $(SYMROOT) $(DSTROOT); do \
 			chown -R root:wheel $${dstroot}; \
@@ -600,6 +598,15 @@ install-chmod-macosx:
 	-set -e; for dstroot in $(SYMROOT) $(DSTROOT); do \
 			chgrp procmod $${dstroot}/$(LIBEXEC_GDB_DIR)/gdb* && chmod g+s $${dstroot}/$(LIBEXEC_GDB_DIR)/gdb*; \
 			chgrp procmod $${dstroot}/$(LIBEXEC_GDB_DIR)/plugins/MacsBug/MacsBug_plugin && chmod g+s $${dstroot}/$(LIBEXEC_GDB_DIR)/plugins/MacsBug/MacsBug_plugin; \
+		done
+
+install-chmod-macosx-noprocmod:
+	set -e; for dstroot in $(SYMROOT) $(DSTROOT); do \
+			chown -R root:wheel $${dstroot}; \
+			chmod -R  u=rwX,g=rX,o=rX $${dstroot}; \
+			chmod a+x $${dstroot}/$(LIBEXEC_GDB_DIR)/*; \
+			chmod a+x $${dstroot}/$(DEVEXEC_DIR)/*; \
+			chmod 755 $${dstroot}/$(LIBEXEC_GDB_DIR)/gdb-*-apple-darwin; \
 		done
 
 install-source:
@@ -616,13 +623,13 @@ ifeq "$(CANONICAL_ARCHS)" "i386-apple-darwin"
 else
 ifeq "$(CANONICAL_ARCHS)" "powerpc-apple-darwin"
 else
-ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin8"
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
 else
 ifeq "$(CANONICAL_ARCHS)" "i386-apple-darwin powerpc-apple-darwin"
 else
 ifeq "$(CANONICAL_ARCHS)" "powerpc-apple-darwin i386-apple-darwin"
 else
-ifeq "$(CANONICAL_ARCHS)" "powerpc-apple-darwin arm-apple-darwin8"
+ifeq "$(CANONICAL_ARCHS)" "powerpc-apple-darwin arm-apple-darwin"
 else
 	echo "Unknown architecture string: \"$(CANONICAL_ARCHS)\""
 	exit 1
@@ -710,14 +717,18 @@ else
 ifeq "$(CANONICAL_ARCHS)" "powerpc-apple-darwin"
 	$(SUBMAKE) install-macsbug
 endif
-ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin8"
-	$(SUBMAKE) install-gdbserver ARM_TARGET=arm-apple-darwin8
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
+	$(SUBMAKE) install-gdbserver ARM_TARGET=arm-apple-darwin
 endif
 endif
-ifneq "$(CANONICAL_ARCHS)" "arm-apple-darwin8"
+ifneq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
 	$(SUBMAKE) install-libcheckpoint
 endif
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
+	$(SUBMAKE) install-chmod-macosx-noprocmod
+else
 	$(SUBMAKE) install-chmod-macosx
+endif
 
 install-macsbug:
 	$(SUBMAKE) -C $(SRCROOT)/macsbug GDB_BUILD_ROOT=$(DSTROOT) BINUTILS_BUILD_ROOT=$(DSTROOT) SRCROOT=$(SRCROOT)/macsbug OBJROOT=$(OBJROOT)/powerpc-apple-darwin--powerpc-apple-darwin/macsbug SYMROOT=$(SYMROOT) DSTROOT=$(DSTROOT) install
@@ -729,7 +740,11 @@ install:
 	$(SUBMAKE) check-args
 	$(SUBMAKE) build
 	$(SUBMAKE) $(MACOSX_FLAGS) install-macosx
+ifeq "$(CANONICAL_ARCHS)" "arm-apple-darwin"
+	$(SUBMAKE) $(MACOSX_FLAGS) install-chmod-macosx-noprocmod
+else
 	$(SUBMAKE) $(MACOSX_FLAGS) install-chmod-macosx
+endif
 
 installhdrs:
 	$(SUBMAKE) check-args
