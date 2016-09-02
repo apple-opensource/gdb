@@ -467,6 +467,11 @@ macho_symfile_read (struct objfile *objfile, int mainline)
   if (bfd_mach_o_stub_library (abfd))
     return;
 
+  /* Also, if the binary is encrypted, then it will only confuse us.  We'll skip
+     reading this in, and gdb will read it from memory later on.  */
+  if (bfd_mach_o_encrypted_binary (abfd))
+    return;
+
   init_minimal_symbol_collection ();
   make_cleanup_discard_minimal_symbols ();
 
@@ -691,12 +696,13 @@ macho_symfile_offsets (struct objfile *objfile,
   memset (objfile->section_offsets, 0,
           SIZEOF_N_SECTION_OFFSETS (objfile->num_sections));
 
-  /* This code is run when we first add the objfile with symfile_add_with_addrs_or_offsets,
-     when "addrs" not "offsets" are passed in.  The place in symfile.c where the addrs are
-     applied depends on the addrs having section names.  But in the dyld code we build
-     an anonymous array of addrs, so that code is a no-op.  Because of that, we have to
-     apply the addrs to the sections here.  N.B. if an objfile slides after we've already
-     created it, then it goes through objfile_relocate.  */
+  /* This code is run when we first add the objfile with 
+     symfile_add_with_addrs_or_offsets, when "addrs" not "offsets" are passed 
+     in.  The place in symfile.c where the addrs are applied depends on the 
+     addrs having section names.  But in the dyld code we build an anonymous 
+     array of addrs, so that code is a no-op.  Because of that, we have to
+     apply the addrs to the sections here.  N.B. if an objfile slides after 
+     we've already created it, then it goes through objfile_relocate.  */
 
   if (addrs->other[0].addr != 0)
     {
@@ -719,6 +725,9 @@ macho_symfile_offsets (struct objfile *objfile,
      are used to index into the objfile's section_offsets, which in turn 
      is supposed to map to the objfile sections.  So we have to do it this
      way instead.  */
+
+  /* NB: The code below is (mostly) a reimplementation of
+     symfile.c:init_objfile_sect_indices() */
 
   i = 0;
   objfile->sect_index_text = 0;

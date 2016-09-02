@@ -108,6 +108,7 @@ extern macosx_dyld_thread_status macosx_dyld_status;
    are never more than two today.  */
 
 struct bfd_memory_footprint {
+  const char *filename;         /* filename of this bfd */
   CORE_ADDR seg1addr;           /* Address of the __TEXT segment */
   int num;                      /* Number of bucket groupings in use */
   int num_allocated;            /* Number of bucket grouping slots allocated */
@@ -702,6 +703,7 @@ scan_bfd_for_memory_groups (struct bfd *abfd, struct pre_run_memory_map *map)
                      xmalloc (sizeof (struct bfd_memory_footprint_group) * 2);
   fp->num = 0;
   fp->num_allocated = 2;
+  fp->filename = abfd->filename;
 
   for (asect = abfd->sections; asect != NULL; asect = asect->next)
     {
@@ -734,6 +736,11 @@ scan_bfd_for_memory_groups (struct bfd *abfd, struct pre_run_memory_map *map)
           current_bucket_start_addr = this_seg_start;
           current_bucket_end_addr = current_bucket_start_addr +
                      ((this_seg_len / map->bucket_size) + 1) * map->bucket_size;
+          /* Did we overflow?  We don't round current_bucket_start_addr down
+             to a bucket boundary so if it's right near the top of memory,
+             current_bucket_start_addr + bucket_size may overflow.  */
+          if (current_bucket_end_addr < current_bucket_start_addr)
+            current_bucket_end_addr = (CORE_ADDR) -1;
           continue;
         }
 
@@ -757,6 +764,11 @@ scan_bfd_for_memory_groups (struct bfd *abfd, struct pre_run_memory_map *map)
                      (((this_seg_end - current_bucket_start_addr) / 
                         map->bucket_size) + 1)
                      * map->bucket_size;
+          /* Did we overflow?  We don't round current_bucket_start_addr down  
+             to a bucket boundary so if it's right near the top of memory,  
+             current_bucket_start_addr + bucket_size may overflow.  */
+          if (current_bucket_end_addr < current_bucket_start_addr)
+            current_bucket_end_addr = (CORE_ADDR) -1;
           continue;
         }
 
@@ -787,7 +799,11 @@ scan_bfd_for_memory_groups (struct bfd *abfd, struct pre_run_memory_map *map)
       current_bucket_start_addr = this_seg_start;
       current_bucket_end_addr = current_bucket_start_addr +    
                  ((this_seg_len / map->bucket_size) + 1) * map->bucket_size;
-    
+      /* Did we overflow?  We don't round current_bucket_start_addr down  
+         to a bucket boundary so if it's right near the top of memory,  
+         current_bucket_start_addr + bucket_size may overflow.  */
+      if (current_bucket_end_addr < current_bucket_start_addr)
+        current_bucket_end_addr = (CORE_ADDR) -1;
     }
 
   /* Update the number of buckets used by the last memory group we saw.  */
@@ -799,6 +815,16 @@ scan_bfd_for_memory_groups (struct bfd *abfd, struct pre_run_memory_map *map)
       fp->groups[fp->num].length = 
                    (current_bucket_end_addr - current_bucket_start_addr) / 
                     map->bucket_size;
+
+      /* Does this grouping overflow?  We don't round current_bucket_start_addr
+         down  to a bucket boundary so if it's right near the top of memory,  
+         current_bucket_start_addr + bucket_size may overflow.  If so, remember
+         to add one to the bucket calculation.  */
+      CORE_ADDR recalculated_endaddr = current_bucket_start_addr + 
+                             (map->bucket_size * fp->groups[fp->num].length);
+      if (recalculated_endaddr < current_bucket_end_addr)
+        fp->groups[fp->num].length += 1;
+
       fp->num++;
     }
   else
@@ -921,14 +947,27 @@ hole_at_p (struct pre_run_memory_map *map,
     return 0;
 }
 
+/* Given a list of memory buckets required for this bfd in FP, and a
+   starting bucket number in MAP, mark the appropriate buckets in 
+   MAP as used.  */
+
 static void
 mark_buckets_as_used (struct pre_run_memory_map *map, int startingbucket, 
                       struct bfd_memory_footprint *fp)
 {
   int memgrp, k;
   for (memgrp = 0; memgrp < fp->num; memgrp++)
-    for (k = 0; k < fp->groups[memgrp].length; k++)
-      map->buckets[startingbucket + fp->groups[memgrp].offset + k] = 1;
+    {
+      struct bfd_memory_footprint_group *group = &fp->groups[memgrp];
+      int initial_bkt = startingbucket + group->offset;
+
+      if (initial_bkt + group->length > map->number_of_buckets)
+        warning ("sharedlibrary preload-libraries exceeded map array while "
+                 "processing '%s'", fp->filename);
+      for (k = 0; k < group->length; k++)
+        if (initial_bkt + k < map->number_of_buckets)
+          map->buckets[initial_bkt + k] = 1;
+    }
 }
 
 void
@@ -1189,7 +1228,7 @@ dyld_load_library (const struct dyld_path_info *d,
 	    }
 	  goto try_again_please;
 	}
-      else if (bfd_mach_o_stub_library (e->abfd))
+      else if (bfd_mach_o_stub_library (e->abfd) || bfd_mach_o_encrypted_binary (e->abfd))
 	{
 	  /* If we find a stub library as the backing file,
 	     then switch to reading from memory.  */

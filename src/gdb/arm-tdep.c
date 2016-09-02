@@ -986,7 +986,9 @@ arm_macosx_skip_prologue_addr_ctx (struct address_context *pc_addr_ctx)
      the scheduler.  */
 
   /* See what the symbol table says.  */
-  if (pc_addr_ctx->symbol && SYMBOL_BLOCK_VALUE (pc_addr_ctx->symbol))
+  if (pc_addr_ctx->symbol 
+      && SYMBOL_CLASS (pc_addr_ctx->symbol) == LOC_BLOCK
+      && SYMBOL_BLOCK_VALUE (pc_addr_ctx->symbol))
     {
       prologue_start = SYMBOL_BLOCK_VALUE (pc_addr_ctx->symbol)->startaddr;
       prologue_end =  SYMBOL_BLOCK_VALUE (pc_addr_ctx->symbol)->endaddr;
@@ -5258,11 +5260,13 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   gdbarch_init_osabi (info, gdbarch);
 
   /* Add some default predicates.  */
-  frame_unwind_append_sniffer (gdbarch, arm_stub_unwind_sniffer);
 #ifdef TM_NEXTSTEP  
   /* APPLE LOCAL: Install the Mac OS X specific sigtramp sniffer.  */
   frame_unwind_append_sniffer (gdbarch, arm_macosx_sigtramp_unwind_sniffer);
 #else
+  /* APPLE LOCAL: We don't have these ".plt stubs" so don't add the
+     sniffer for them.  */
+  frame_unwind_append_sniffer (gdbarch, arm_stub_unwind_sniffer);
   frame_unwind_append_sniffer (gdbarch, arm_sigtramp_unwind_sniffer);
 #endif
   frame_unwind_append_sniffer (gdbarch, dwarf2_frame_sniffer);
